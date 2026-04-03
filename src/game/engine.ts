@@ -59,10 +59,11 @@ export function resetForNewGame(state: GameState): GameState {
 function spawnObstacle(canvasW: number, lineY: number, isTop: boolean): Obstacle {
   const types: Obstacle['type'][] = ['triangle', 'circle', 'star', 'spike', 'diamond'];
   const type = types[Math.floor(Math.random() * types.length)];
-  const size = 20 + Math.random() * 15;
+  const size = 30 + Math.random() * 20; // 30-50px consistent height
+  // Position so the base sits exactly on the line
   const y = isTop
-    ? lineY - size - Math.random() * 40
-    : lineY + size + Math.random() * 40;
+    ? lineY - size / 2  // top half: center above line so bottom edge touches line
+    : lineY + size / 2; // bottom half: center below line so top edge touches line
   return { x: canvasW + 50, y, type, size, isTop };
 }
 
@@ -89,9 +90,10 @@ function addParticles(particles: Particle[], x: number, y: number, color: string
 }
 
 function checkCollision(player: Player, obs: Obstacle): boolean {
+  const shrink = 0.85; // 15% smaller hitbox for forgiveness
   const dx = Math.abs(player.x - obs.x);
   const dy = Math.abs(player.y - obs.y);
-  return dx < (player.size / 2 + obs.size / 2) && dy < (player.size / 2 + obs.size / 2);
+  return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + obs.size / 2) * shrink;
 }
 
 let lastObstacleX = 0;
@@ -170,16 +172,15 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
-  // Spawn obstacles
+  // Spawn obstacles — enforce minimum gap of OBSTACLE_MIN_GAP
   const rightmostObs = state.obstacles.length > 0
     ? Math.max(...state.obstacles.map(o => o.x))
     : 0;
-  if (rightmostObs < canvasW + 50 || frameCount % Math.max(30, 60 - Math.floor(state.distance / 50)) === 0) {
-    if (rightmostObs < canvasW - OBSTACLE_MIN_GAP + Math.random() * 100) {
-      state.obstacles.push(spawnObstacle(canvasW, lineY, true));
-      if (state.phase === 2) {
-        state.obstacles.push(spawnObstacle(canvasW, lineY, false));
-      }
+  const minSpawn = canvasW + 20;
+  if (rightmostObs < minSpawn - OBSTACLE_MIN_GAP) {
+    state.obstacles.push(spawnObstacle(canvasW, lineY, true));
+    if (state.phase === 2) {
+      state.obstacles.push(spawnObstacle(canvasW, lineY, false));
     }
   }
 
@@ -364,44 +365,73 @@ export function render(
   drawPlayer(state.playerTop);
   if (state.playerBottom) drawPlayer(state.playerBottom);
 
-  // Draw obstacles
+  // Draw obstacles with ground shadow
   for (const obs of state.obstacles) {
     ctx.save();
+    
+    // Ground shadow — ellipse on the line under the obstacle
+    const shadowY = obs.isTop ? lineY : lineY;
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#ff3366';
+    ctx.beginPath();
+    ctx.ellipse(obs.x, shadowY, obs.size / 2 + 4, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
     ctx.fillStyle = '#ff3366';
     ctx.shadowColor = '#ff3366';
     ctx.shadowBlur = 10;
+    
+    // All shapes drawn so their base sits on the line
+    const half = obs.size / 2;
     switch (obs.type) {
       case 'triangle':
         ctx.beginPath();
-        ctx.moveTo(obs.x, obs.y - obs.size / 2);
-        ctx.lineTo(obs.x + obs.size / 2, obs.y + obs.size / 2);
-        ctx.lineTo(obs.x - obs.size / 2, obs.y + obs.size / 2);
+        if (obs.isTop) {
+          // Base at bottom (on line), point up
+          ctx.moveTo(obs.x, obs.y - half);
+          ctx.lineTo(obs.x + half, obs.y + half);
+          ctx.lineTo(obs.x - half, obs.y + half);
+        } else {
+          // Base at top (on line), point down
+          ctx.moveTo(obs.x, obs.y + half);
+          ctx.lineTo(obs.x + half, obs.y - half);
+          ctx.lineTo(obs.x - half, obs.y - half);
+        }
         ctx.closePath();
         ctx.fill();
         break;
       case 'circle':
         ctx.beginPath();
-        ctx.arc(obs.x, obs.y, obs.size / 2, 0, Math.PI * 2);
+        ctx.arc(obs.x, obs.y, half, 0, Math.PI * 2);
         ctx.fill();
         break;
       case 'star':
-        drawStar(ctx, obs.x, obs.y, 5, obs.size / 2, obs.size / 4);
+        drawStar(ctx, obs.x, obs.y, 5, half, half / 2);
         break;
       case 'spike':
         ctx.beginPath();
-        ctx.moveTo(obs.x - obs.size / 2, obs.y + obs.size / 2);
-        ctx.lineTo(obs.x, obs.y - obs.size / 2);
-        ctx.lineTo(obs.x + obs.size / 2, obs.y + obs.size / 2);
-        ctx.lineTo(obs.x, obs.y + obs.size / 4);
+        if (obs.isTop) {
+          ctx.moveTo(obs.x - half, obs.y + half);
+          ctx.lineTo(obs.x, obs.y - half);
+          ctx.lineTo(obs.x + half, obs.y + half);
+          ctx.lineTo(obs.x, obs.y + half * 0.5);
+        } else {
+          ctx.moveTo(obs.x - half, obs.y - half);
+          ctx.lineTo(obs.x, obs.y + half);
+          ctx.lineTo(obs.x + half, obs.y - half);
+          ctx.lineTo(obs.x, obs.y - half * 0.5);
+        }
         ctx.closePath();
         ctx.fill();
         break;
       case 'diamond':
         ctx.beginPath();
-        ctx.moveTo(obs.x, obs.y - obs.size / 2);
-        ctx.lineTo(obs.x + obs.size / 2, obs.y);
-        ctx.lineTo(obs.x, obs.y + obs.size / 2);
-        ctx.lineTo(obs.x - obs.size / 2, obs.y);
+        ctx.moveTo(obs.x, obs.y - half);
+        ctx.lineTo(obs.x + half, obs.y);
+        ctx.lineTo(obs.x, obs.y + half);
+        ctx.lineTo(obs.x - half, obs.y);
         ctx.closePath();
         ctx.fill();
         break;
