@@ -15,14 +15,21 @@ import {
 } from './constants';
 
 const MAX_VISIBLE_OBSTACLES = 3;
-const MIN_OBSTACLE_SPACING_PX = 400;
 const OBSTACLE_SPAWN_X_OFFSET = 64;
 const COIN_SAFE_CLEARANCE_X = 110;
 const COIN_MIN_WINDOW_WIDTH = 140;
+const SAFE_SPAWN_ZONE = 300; // no obstacles within 300px of player start
 
 let frameCount = 0;
 let forceEasyFollowUp = false;
 let nextPhase2ObstacleOnTop = true;
+let isFirstObstacle = true;
+let lastMilestone = 0;
+let milestoneFlashTimer = 0;
+let milestoneFlashScore = 0;
+// Pattern system: tracks consecutive spawns for rhythm patterns
+let patternCount = 0; // how many obstacles spawned in current "burst"
+let patternGapPending = false; // if true, next spawn must be a long gap
 
 function makePlayer(x: number, y: number, isAboveLine: boolean): Player {
   return {
@@ -53,74 +60,64 @@ function getJumpHeight() {
   return (Math.abs(JUMP_FORCE) * Math.abs(JUMP_FORCE)) / (2 * GRAVITY);
 }
 
-function getSpawnProfile(distance: number) {
-  if (distance < 100) {
-    return { gapPx: 560, easyGapPx: 660, sizeScale: 0.72, hardChance: 0 };
-  }
-  if (distance < 200) {
-    return { gapPx: 500, easyGapPx: 600, sizeScale: 0.82, hardChance: 0 };
-  }
-  if (distance < 350) {
-    return { gapPx: 450, easyGapPx: 540, sizeScale: 0.92, hardChance: 0.12 };
-  }
-  return { gapPx: 400, easyGapPx: 500, sizeScale: 1, hardChance: 0.2 };
+function getPhase(distance: number): 1 | 2 | 3 | 4 {
+  if (distance < 100) return 1;
+  if (distance < 300) return 2;
+  if (distance < 600) return 3;
+  return 4;
 }
 
-function getObstacleSizeCap(type: Obstacle['type']) {
-  const jumpLimitedCap = getJumpHeight() * 0.6;
-  const typeCap =
-    type === 'triangle'
-      ? 45
-      : type === 'circle'
-        ? 40
-        : type === 'star' || type === 'diamond'
-          ? 40
-          : 40;
+function getSpawnProfile(distance: number) {
+  const phase = getPhase(distance);
+  switch (phase) {
+    case 1: return { minGap: 500, maxGap: 700, maxSize: 35, speedMult: 1.0, hardChance: 0, maxBurst: 1 };
+    case 2: return { minGap: 350, maxGap: 500, maxSize: 40, speedMult: 1.2, hardChance: 0.1, maxBurst: 2 };
+    case 3: return { minGap: 250, maxGap: 380, maxSize: 50, speedMult: 1.4, hardChance: 0.2, maxBurst: 3 };
+    case 4: return { minGap: 180, maxGap: 280, maxSize: 50, speedMult: 1.65, hardChance: 0.3, maxBurst: 4 };
+  }
+}
 
+function getObstacleSizeCap(type: Obstacle['type'], distance: number) {
+  const jumpLimitedCap = getJumpHeight() * 0.6;
+  const profile = getSpawnProfile(distance);
+  const typeCap =
+    type === 'triangle' ? Math.min(45, profile.maxSize)
+    : type === 'circle' ? Math.min(40, profile.maxSize)
+    : Math.min(40, profile.maxSize);
   return Math.min(typeCap, jumpLimitedCap);
 }
 
 function chooseObstacleType(distance: number, mustBeEasy: boolean): Obstacle['type'] {
-  if (mustBeEasy) {
-    return randomFrom(['triangle', 'diamond', 'spike']);
+  const phase = getPhase(distance);
+
+  if (mustBeEasy || phase === 1) {
+    return randomFrom(['triangle', 'diamond']);
   }
 
-  const profile = getSpawnProfile(distance);
-
-  if (distance >= 200 && Math.random() < profile.hardChance) {
-    return randomFrom(['circle', 'star']);
+  if (phase === 2) {
+    return randomFrom(['triangle', 'diamond', 'circle', 'star']);
   }
 
-  if (distance < 100) {
-    return randomFrom(['triangle', 'diamond', 'circle']);
-  }
-
-  return randomFrom(['triangle', 'circle', 'diamond', 'spike']);
+  // Phase 3 & 4: all types
+  return randomFrom(['triangle', 'circle', 'diamond', 'spike', 'star']);
 }
 
 function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: boolean) {
-  const profile = getSpawnProfile(distance);
-  const cap = getObstacleSizeCap(type);
-  const isPotentialHardType = type === 'circle' || type === 'star';
+  const cap = getObstacleSizeCap(type, distance);
+  const phase = getPhase(distance);
 
-  let minSize = type === 'triangle' || type === 'spike' ? 28 : 24;
-  let maxSize = cap * profile.sizeScale;
+  let minSize = type === 'triangle' || type === 'spike' ? 24 : 22;
+  let maxSize = cap;
 
-  if (distance < 100) {
-    maxSize = Math.min(maxSize, type === 'triangle' || type === 'spike' ? 34 : 30);
+  if (phase === 1) {
+    maxSize = Math.min(maxSize, 35);
   }
 
   if (mustBeEasy) {
-    maxSize = Math.min(maxSize, type === 'triangle' || type === 'spike' ? 34 : 30);
-  }
-
-  if (!mustBeEasy && distance >= 200 && isPotentialHardType) {
-    minSize = Math.max(minSize, 34);
-    maxSize = cap;
+    maxSize = Math.min(maxSize, 32);
   }
 
   maxSize = Math.max(maxSize, minSize + 2);
-
   return randomBetween(minSize, maxSize);
 }
 
@@ -339,6 +336,12 @@ export function resetSpawners() {
   frameCount = 0;
   forceEasyFollowUp = false;
   nextPhase2ObstacleOnTop = true;
+  isFirstObstacle = true;
+  lastMilestone = 0;
+  milestoneFlashTimer = 0;
+  milestoneFlashScore = 0;
+  patternCount = 0;
+  patternGapPending = false;
 }
 
 export function update(state: GameState, canvasW: number, canvasH: number, dt: number): GameState {
@@ -347,7 +350,9 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   const lineY = (canvasH - BANNER_HEIGHT) / 2;
   frameCount++;
 
-  state.speed = Math.min(MAX_SPEED, state.baseSpeed + state.distance * SPEED_INCREMENT);
+  // Speed scales by phase profile, not just raw distance
+  const spawnProfile = getSpawnProfile(state.distance);
+  state.speed = Math.min(MAX_SPEED, state.baseSpeed * spawnProfile.speedMult + state.distance * SPEED_INCREMENT * 0.3);
 
   let effectiveSpeed = state.speed;
   const slowmo = state.activePowers.find(p => p.type === 'slowmo');
@@ -359,6 +364,15 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
 
   state.distance += effectiveSpeed * 0.1;
   state.score = Math.floor(state.distance);
+
+  // Milestone flash every 100m
+  const currentMilestone = Math.floor(state.distance / 100) * 100;
+  if (currentMilestone > lastMilestone && currentMilestone > 0) {
+    lastMilestone = currentMilestone;
+    milestoneFlashTimer = 1.5; // seconds
+    milestoneFlashScore = currentMilestone;
+  }
+  if (milestoneFlashTimer > 0) milestoneFlashTimer = Math.max(0, milestoneFlashTimer - dt / 1000);
 
   if (state.screenShake > 0) state.screenShake = Math.max(0, state.screenShake - dt * 0.01);
   if (state.coinFlash > 0) state.coinFlash = Math.max(0, state.coinFlash - dt * 0.005);
@@ -419,26 +433,62 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
-  const spawnProfile = getSpawnProfile(state.distance);
   const visibleObstacleCount = state.obstacles.filter(
     o => o.x + o.size / 2 >= 0 && o.x - o.size / 2 <= canvasW,
   ).length;
 
   if (visibleObstacleCount < MAX_VISIBLE_OBSTACLES) {
+    const mustBeEasy = forceEasyFollowUp || patternGapPending;
     const spawnOnTop = state.phase === 1 ? true : nextPhase2ObstacleOnTop;
-    const candidate = createObstacle(canvasW, lineY, spawnOnTop, state.distance, forceEasyFollowUp);
-    const requiredGapPx = Math.max(
-      MIN_OBSTACLE_SPACING_PX,
-      forceEasyFollowUp ? spawnProfile.easyGapPx : spawnProfile.gapPx,
-    );
+
+    // First obstacle is always a small triangle
+    let candidate: Obstacle;
+    if (isFirstObstacle) {
+      candidate = {
+        x: canvasW + OBSTACLE_SPAWN_X_OFFSET,
+        y: (canvasH - BANNER_HEIGHT) / 2 - 15,
+        type: 'triangle',
+        size: 28,
+        isTop: true,
+      };
+    } else {
+      candidate = createObstacle(canvasW, (canvasH - BANNER_HEIGHT) / 2, spawnOnTop, state.distance, mustBeEasy);
+    }
+
+    // Determine required gap based on phase + pattern state
+    let requiredGapPx: number;
+    if (patternGapPending) {
+      // Long gap after a burst
+      requiredGapPx = spawnProfile.maxGap * 1.3;
+    } else {
+      requiredGapPx = randomBetween(spawnProfile.minGap, spawnProfile.maxGap);
+    }
+
+    // Enforce safe spawn zone at game start
+    if (isFirstObstacle) {
+      requiredGapPx = Math.max(requiredGapPx, SAFE_SPAWN_ZONE);
+    }
+
     const rightmostObstacleRightEdge = state.obstacles.length > 0
       ? Math.max(...state.obstacles.map(o => o.x + o.size / 2))
-      : Number.NEGATIVE_INFINITY;
+      : state.playerTop.x - SAFE_SPAWN_ZONE; // ensure first obstacle respects safe zone
     const hasEnoughGap = state.obstacles.length === 0
       || rightmostObstacleRightEdge <= candidate.x - candidate.size / 2 - requiredGapPx;
 
     if (hasEnoughGap) {
       state.obstacles.push(candidate);
+      isFirstObstacle = false;
+
+      // Pattern/rhythm system
+      if (patternGapPending) {
+        patternGapPending = false;
+        patternCount = 0;
+      }
+      patternCount++;
+      if (patternCount >= spawnProfile.maxBurst) {
+        patternGapPending = true;
+      }
+
       forceEasyFollowUp = isHardObstacle(candidate);
       if (state.phase === 2) {
         nextPhase2ObstacleOnTop = !nextPhase2ObstacleOnTop;
@@ -758,6 +808,20 @@ export function render(
     ctx.font = 'bold 18px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('PHASE 2!', canvasW / 2, 60);
+    ctx.restore();
+  }
+
+  // Milestone flash
+  if (milestoneFlashTimer > 0 && state.screen === 'playing') {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, milestoneFlashTimer);
+    ctx.fillStyle = '#00ffcc';
+    ctx.shadowColor = '#00ffcc';
+    ctx.shadowBlur = 30;
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${milestoneFlashScore}m`, canvasW / 2, h / 2 - 80);
     ctx.restore();
   }
 
