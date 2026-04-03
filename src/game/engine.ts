@@ -365,44 +365,73 @@ export function render(
   drawPlayer(state.playerTop);
   if (state.playerBottom) drawPlayer(state.playerBottom);
 
-  // Draw obstacles
+  // Draw obstacles with ground shadow
   for (const obs of state.obstacles) {
     ctx.save();
+    
+    // Ground shadow — ellipse on the line under the obstacle
+    const shadowY = obs.isTop ? lineY : lineY;
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#ff3366';
+    ctx.beginPath();
+    ctx.ellipse(obs.x, shadowY, obs.size / 2 + 4, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
     ctx.fillStyle = '#ff3366';
     ctx.shadowColor = '#ff3366';
     ctx.shadowBlur = 10;
+    
+    // All shapes drawn so their base sits on the line
+    const half = obs.size / 2;
     switch (obs.type) {
       case 'triangle':
         ctx.beginPath();
-        ctx.moveTo(obs.x, obs.y - obs.size / 2);
-        ctx.lineTo(obs.x + obs.size / 2, obs.y + obs.size / 2);
-        ctx.lineTo(obs.x - obs.size / 2, obs.y + obs.size / 2);
+        if (obs.isTop) {
+          // Base at bottom (on line), point up
+          ctx.moveTo(obs.x, obs.y - half);
+          ctx.lineTo(obs.x + half, obs.y + half);
+          ctx.lineTo(obs.x - half, obs.y + half);
+        } else {
+          // Base at top (on line), point down
+          ctx.moveTo(obs.x, obs.y + half);
+          ctx.lineTo(obs.x + half, obs.y - half);
+          ctx.lineTo(obs.x - half, obs.y - half);
+        }
         ctx.closePath();
         ctx.fill();
         break;
       case 'circle':
         ctx.beginPath();
-        ctx.arc(obs.x, obs.y, obs.size / 2, 0, Math.PI * 2);
+        ctx.arc(obs.x, obs.y, half, 0, Math.PI * 2);
         ctx.fill();
         break;
       case 'star':
-        drawStar(ctx, obs.x, obs.y, 5, obs.size / 2, obs.size / 4);
+        drawStar(ctx, obs.x, obs.y, 5, half, half / 2);
         break;
       case 'spike':
         ctx.beginPath();
-        ctx.moveTo(obs.x - obs.size / 2, obs.y + obs.size / 2);
-        ctx.lineTo(obs.x, obs.y - obs.size / 2);
-        ctx.lineTo(obs.x + obs.size / 2, obs.y + obs.size / 2);
-        ctx.lineTo(obs.x, obs.y + obs.size / 4);
+        if (obs.isTop) {
+          ctx.moveTo(obs.x - half, obs.y + half);
+          ctx.lineTo(obs.x, obs.y - half);
+          ctx.lineTo(obs.x + half, obs.y + half);
+          ctx.lineTo(obs.x, obs.y + half * 0.5);
+        } else {
+          ctx.moveTo(obs.x - half, obs.y - half);
+          ctx.lineTo(obs.x, obs.y + half);
+          ctx.lineTo(obs.x + half, obs.y - half);
+          ctx.lineTo(obs.x, obs.y - half * 0.5);
+        }
         ctx.closePath();
         ctx.fill();
         break;
       case 'diamond':
         ctx.beginPath();
-        ctx.moveTo(obs.x, obs.y - obs.size / 2);
-        ctx.lineTo(obs.x + obs.size / 2, obs.y);
-        ctx.lineTo(obs.x, obs.y + obs.size / 2);
-        ctx.lineTo(obs.x - obs.size / 2, obs.y);
+        ctx.moveTo(obs.x, obs.y - half);
+        ctx.lineTo(obs.x + half, obs.y);
+        ctx.lineTo(obs.x, obs.y + half);
+        ctx.lineTo(obs.x - half, obs.y);
         ctx.closePath();
         ctx.fill();
         break;
