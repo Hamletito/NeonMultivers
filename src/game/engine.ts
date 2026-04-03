@@ -15,14 +15,21 @@ import {
 } from './constants';
 
 const MAX_VISIBLE_OBSTACLES = 3;
-const MIN_OBSTACLE_SPACING_PX = 400;
 const OBSTACLE_SPAWN_X_OFFSET = 64;
 const COIN_SAFE_CLEARANCE_X = 110;
 const COIN_MIN_WINDOW_WIDTH = 140;
+const SAFE_SPAWN_ZONE = 300; // no obstacles within 300px of player start
 
 let frameCount = 0;
 let forceEasyFollowUp = false;
 let nextPhase2ObstacleOnTop = true;
+let isFirstObstacle = true;
+let lastMilestone = 0;
+let milestoneFlashTimer = 0;
+let milestoneFlashScore = 0;
+// Pattern system: tracks consecutive spawns for rhythm patterns
+let patternCount = 0; // how many obstacles spawned in current "burst"
+let patternGapPending = false; // if true, next spawn must be a long gap
 
 function makePlayer(x: number, y: number, isAboveLine: boolean): Player {
   return {
