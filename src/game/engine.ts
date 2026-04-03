@@ -59,10 +59,11 @@ export function resetForNewGame(state: GameState): GameState {
 function spawnObstacle(canvasW: number, lineY: number, isTop: boolean): Obstacle {
   const types: Obstacle['type'][] = ['triangle', 'circle', 'star', 'spike', 'diamond'];
   const type = types[Math.floor(Math.random() * types.length)];
-  const size = 20 + Math.random() * 15;
+  const size = 30 + Math.random() * 20; // 30-50px consistent height
+  // Position so the base sits exactly on the line
   const y = isTop
-    ? lineY - size - Math.random() * 40
-    : lineY + size + Math.random() * 40;
+    ? lineY - size / 2  // top half: center above line so bottom edge touches line
+    : lineY + size / 2; // bottom half: center below line so top edge touches line
   return { x: canvasW + 50, y, type, size, isTop };
 }
 
