@@ -501,11 +501,11 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
           state.obstacles = state.obstacles.filter(o => o !== obs);
           addParticles(state.particles, p.x, p.y, '#00ffcc', 15);
         } else {
-          state.screenShake = 1;
           addParticles(state.particles, p.x, p.y, skinColor, 30);
           if (state.playerBottom) {
             addParticles(state.particles, state.playerBottom.x, state.playerBottom.y, skinColor, 30);
           }
+          state.screenShake = 0;
           state.screen = 'gameover';
           const distCoins = Math.floor(state.distance / 10);
           state.coins += distCoins;
@@ -543,15 +543,17 @@ export function render(
   const h = canvasH - BANNER_HEIGHT;
   const lineY = h / 2;
 
+  // Shake is strictly scoped to playing state
   let shakeX = 0;
   let shakeY = 0;
-  if (state.screenShake > 0) {
+  if (state.screen === 'playing' && state.screenShake > 0) {
     const intensity = state.screenShake * 8;
     shakeX = (Math.random() - 0.5) * intensity;
     shakeY = (Math.random() - 0.5) * intensity;
   }
 
   ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // hard reset
   ctx.translate(shakeX, shakeY);
 
   ctx.fillStyle = BG_COLOR;
