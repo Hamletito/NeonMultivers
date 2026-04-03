@@ -501,8 +501,8 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
           state.obstacles = state.obstacles.filter(o => o !== obs);
           addParticles(state.particles, p.x, p.y, '#00ffcc', 15);
         } else {
-          state.screenShake = 1;
-          addParticles(state.particles, p.x, p.y, skinColor, 30);
+          state.screenShake = 0; // clear shake before transitioning
+          state.screen = 'gameover';
           if (state.playerBottom) {
             addParticles(state.particles, state.playerBottom.x, state.playerBottom.y, skinColor, 30);
           }
