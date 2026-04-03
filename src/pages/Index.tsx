@@ -78,7 +78,7 @@ const Index = () => {
     <div className="w-full h-screen overflow-hidden bg-background">
       <GameCanvas state={state} onStateChange={setState} />
       <MenuScreen state={state} onPlay={handlePlay} onShop={handleShop} />
-      <HUD state={state} onPause={handlePause} />
+      <HUD state={state} onPause={handlePause} onActivatePower={handleActivatePower} />
       <GameOverScreen state={state} onRevive={handleRevive} onMenu={handleMenu} />
       <PauseOverlay visible={state.screen === 'paused'} onResume={handleResume} onMenu={handleMenu} />
       {state.screen === 'shop' && (
