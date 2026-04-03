@@ -1,16 +1,209 @@
 import { GameState, Obstacle, Coin, Particle, Player } from './types';
 import {
-  BG_COLOR, LINE_COLOR, LINE_GLOW_COLOR, PLAYER_SIZE, GRAVITY, JUMP_FORCE,
-  BASE_SPEED, SPEED_INCREMENT, MAX_SPEED, PHASE2_DISTANCE, OBSTACLE_MIN_GAP,
-  COIN_RADIUS, BANNER_HEIGHT, SKIN_COLORS,
+  BG_COLOR,
+  LINE_COLOR,
+  PLAYER_SIZE,
+  GRAVITY,
+  JUMP_FORCE,
+  BASE_SPEED,
+  SPEED_INCREMENT,
+  MAX_SPEED,
+  PHASE2_DISTANCE,
+  COIN_RADIUS,
+  BANNER_HEIGHT,
+  SKIN_COLORS,
 } from './constants';
+
+const MAX_VISIBLE_OBSTACLES = 3;
+const MIN_OBSTACLE_SPACING_PX = 400;
+const OBSTACLE_SPAWN_X_OFFSET = 64;
+const COIN_SAFE_CLEARANCE_X = 110;
+const COIN_MIN_WINDOW_WIDTH = 140;
+
+let frameCount = 0;
+let forceEasyFollowUp = false;
+let nextPhase2ObstacleOnTop = true;
 
 function makePlayer(x: number, y: number, isAboveLine: boolean): Player {
   return {
-    x, y, size: PLAYER_SIZE, vy: 0,
-    isJumping: false, isAboveLine,
-    squashX: 1, squashY: 1, rotation: 0,
-    anticipation: 0, landTimer: 0, wasJumping: false,
+    x,
+    y,
+    size: PLAYER_SIZE,
+    vy: 0,
+    isJumping: false,
+    isAboveLine,
+    squashX: 1,
+    squashY: 1,
+    rotation: 0,
+    anticipation: 0,
+    landTimer: 0,
+    wasJumping: false,
+  };
+}
+
+function randomBetween(min: number, max: number) {
+  return min + Math.random() * (max - min);
+}
+
+function randomFrom<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function getJumpHeight() {
+  return (Math.abs(JUMP_FORCE) * Math.abs(JUMP_FORCE)) / (2 * GRAVITY);
+}
+
+function getSpawnProfile(distance: number) {
+  if (distance < 100) {
+    return { gapPx: 560, easyGapPx: 660, sizeScale: 0.72, hardChance: 0 };
+  }
+  if (distance < 200) {
+    return { gapPx: 500, easyGapPx: 600, sizeScale: 0.82, hardChance: 0 };
+  }
+  if (distance < 350) {
+    return { gapPx: 450, easyGapPx: 540, sizeScale: 0.92, hardChance: 0.12 };
+  }
+  return { gapPx: 400, easyGapPx: 500, sizeScale: 1, hardChance: 0.2 };
+}
+
+function getObstacleSizeCap(type: Obstacle['type']) {
+  const jumpLimitedCap = getJumpHeight() * 0.6;
+  const typeCap =
+    type === 'triangle'
+      ? 45
+      : type === 'circle'
+        ? 40
+        : type === 'star' || type === 'diamond'
+          ? 40
+          : 40;
+
+  return Math.min(typeCap, jumpLimitedCap);
+}
+
+function chooseObstacleType(distance: number, mustBeEasy: boolean): Obstacle['type'] {
+  if (mustBeEasy) {
+    return randomFrom(['triangle', 'diamond', 'spike']);
+  }
+
+  const profile = getSpawnProfile(distance);
+
+  if (distance >= 200 && Math.random() < profile.hardChance) {
+    return randomFrom(['circle', 'star']);
+  }
+
+  if (distance < 100) {
+    return randomFrom(['triangle', 'diamond', 'circle']);
+  }
+
+  return randomFrom(['triangle', 'circle', 'diamond', 'spike']);
+}
+
+function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: boolean) {
+  const profile = getSpawnProfile(distance);
+  const cap = getObstacleSizeCap(type);
+  const isPotentialHardType = type === 'circle' || type === 'star';
+
+  let minSize = type === 'triangle' || type === 'spike' ? 28 : 24;
+  let maxSize = cap * profile.sizeScale;
+
+  if (distance < 100) {
+    maxSize = Math.min(maxSize, type === 'triangle' || type === 'spike' ? 34 : 30);
+  }
+
+  if (mustBeEasy) {
+    maxSize = Math.min(maxSize, type === 'triangle' || type === 'spike' ? 34 : 30);
+  }
+
+  if (!mustBeEasy && distance >= 200 && isPotentialHardType) {
+    minSize = Math.max(minSize, 34);
+    maxSize = cap;
+  }
+
+  maxSize = Math.max(maxSize, minSize + 2);
+
+  return randomBetween(minSize, maxSize);
+}
+
+function isHardObstacle(obstacle: Obstacle) {
+  return (obstacle.type === 'circle' || obstacle.type === 'star') && obstacle.size >= 34;
+}
+
+function createObstacle(
+  canvasW: number,
+  lineY: number,
+  isTop: boolean,
+  distance: number,
+  mustBeEasy: boolean,
+): Obstacle {
+  const type = chooseObstacleType(distance, mustBeEasy);
+  const size = getObstacleSize(type, distance, mustBeEasy);
+  const y = isTop ? lineY - size / 2 : lineY + size / 2;
+
+  return {
+    x: canvasW + OBSTACLE_SPAWN_X_OFFSET,
+    y,
+    type,
+    size,
+    isTop,
+  };
+}
+
+function buildSafeCoinWindows(obstacles: Obstacle[], playerX: number, canvasW: number) {
+  const start = playerX + 220;
+  const end = canvasW - 96;
+
+  if (end - start < COIN_MIN_WINDOW_WIDTH) return [] as Array<[number, number]>;
+
+  const blocked = obstacles
+    .filter(o => o.x + o.size / 2 > start && o.x - o.size / 2 < end)
+    .map(o => [
+      Math.max(start, o.x - o.size / 2 - COIN_SAFE_CLEARANCE_X),
+      Math.min(end, o.x + o.size / 2 + COIN_SAFE_CLEARANCE_X),
+    ] as [number, number])
+    .sort((a, b) => a[0] - b[0]);
+
+  const merged: Array<[number, number]> = [];
+  for (const [left, right] of blocked) {
+    const last = merged[merged.length - 1];
+    if (!last || left > last[1]) {
+      merged.push([left, right]);
+    } else {
+      last[1] = Math.max(last[1], right);
+    }
+  }
+
+  const windows: Array<[number, number]> = [];
+  let cursor = start;
+
+  for (const [left, right] of merged) {
+    if (left - cursor >= COIN_MIN_WINDOW_WIDTH) {
+      windows.push([cursor, left]);
+    }
+    cursor = Math.max(cursor, right);
+  }
+
+  if (end - cursor >= COIN_MIN_WINDOW_WIDTH) {
+    windows.push([cursor, end]);
+  }
+
+  return windows;
+}
+
+function spawnSafeCoin(state: GameState, canvasW: number, lineY: number): Coin | null {
+  const windows = buildSafeCoinWindows(state.obstacles, state.playerTop.x, canvasW);
+  if (windows.length === 0) return null;
+
+  const [left, right] = randomFrom(windows);
+  const x = (left + right) / 2;
+  const verticalOffset = PLAYER_SIZE + 34 + Math.random() * 10;
+  const isTop = state.phase === 1 ? true : Math.random() > 0.5;
+  const y = isTop ? lineY - verticalOffset : lineY + verticalOffset;
+
+  return {
+    x,
+    y,
+    collected: false,
+    radius: COIN_RADIUS,
   };
 }
 
@@ -65,29 +258,16 @@ export function resetForNewGame(state: GameState): GameState {
   };
 }
 
-function spawnObstacle(canvasW: number, lineY: number, isTop: boolean): Obstacle {
-  const types: Obstacle['type'][] = ['triangle', 'circle', 'star', 'spike', 'diamond'];
-  const type = types[Math.floor(Math.random() * types.length)];
-  const size = 30 + Math.random() * 20;
-  const y = isTop ? lineY - size / 2 : lineY + size / 2;
-  return { x: canvasW + 50, y, type, size, isTop };
-}
-
-function spawnCoin(canvasW: number, lineY: number, phase: 1 | 2): Coin {
-  const isTop = phase === 1 ? true : Math.random() > 0.5;
-  const y = isTop
-    ? lineY - 30 - Math.random() * 60
-    : lineY + 30 + Math.random() * 60;
-  return { x: canvasW + 50 + Math.random() * 200, y, collected: false, radius: COIN_RADIUS };
-}
-
 function addParticles(particles: Particle[], x: number, y: number, color: string, count: number) {
   for (let i = 0; i < count; i++) {
     particles.push({
-      x, y,
+      x,
+      y,
       vx: (Math.random() - 0.5) * 6,
       vy: (Math.random() - 0.5) * 6,
-      life: 1, maxLife: 1, color,
+      life: 1,
+      maxLife: 1,
+      color,
       size: 2 + Math.random() * 3,
     });
   }
@@ -99,20 +279,23 @@ function addTrailParticle(particles: Particle[], p: Player, color: string) {
     y: p.y + (Math.random() - 0.5) * p.size * 0.5,
     vx: -1 - Math.random(),
     vy: (Math.random() - 0.5) * 0.5,
-    life: 0.6, maxLife: 0.6, color,
+    life: 0.6,
+    maxLife: 0.6,
+    color,
     size: 1.5 + Math.random() * 2,
   });
 }
 
 function addLandingParticles(particles: Particle[], p: Player, lineY: number, color: string) {
-  const groundY = p.isAboveLine ? lineY : lineY;
   for (let i = 0; i < 8; i++) {
     particles.push({
       x: p.x + (Math.random() - 0.5) * p.size,
-      y: groundY,
+      y: lineY,
       vx: (Math.random() - 0.5) * 4,
-      vy: p.isAboveLine ? -(Math.random() * 2) : (Math.random() * 2),
-      life: 0.5, maxLife: 0.5, color,
+      vy: p.isAboveLine ? -(Math.random() * 2) : Math.random() * 2,
+      life: 0.5,
+      maxLife: 0.5,
+      color,
       size: 1.5 + Math.random() * 2,
     });
   }
@@ -126,42 +309,36 @@ function checkCollision(player: Player, obs: Obstacle): boolean {
 }
 
 function updatePlayerAnim(p: Player, dt: number) {
-  // Land squash decay
   if (p.landTimer > 0) {
     p.landTimer = Math.max(0, p.landTimer - dt);
-    const t = p.landTimer / 100; // 0→1 during squash
-    p.squashX = 1 + 0.2 * t; // wider
-    p.squashY = 1 - 0.15 * t; // shorter
+    const t = p.landTimer / 100;
+    p.squashX = 1 + 0.2 * t;
+    p.squashY = 1 - 0.15 * t;
   } else if (p.anticipation > 0) {
-    // Jump anticipation squash (before launch)
     p.squashX = 1 + 0.1 * p.anticipation;
     p.squashY = 1 - 0.15 * p.anticipation;
     p.anticipation = Math.max(0, p.anticipation - dt / 80);
   } else if (p.isJumping) {
-    // Airborne: stretch vertically, gentle rotation
     const stretchFactor = Math.min(1, Math.abs(p.vy) / 10);
     p.squashX = 1 - 0.12 * stretchFactor;
     p.squashY = 1 + 0.18 * stretchFactor;
-    // Gentle tilt up to 15° based on vertical velocity
-    const maxRot = 15 * Math.PI / 180;
+    const maxRot = (15 * Math.PI) / 180;
     const dir = p.isAboveLine ? 1 : -1;
     p.rotation = dir * (p.vy / Math.abs(JUMP_FORCE)) * maxRot * 0.5;
   } else {
-    // Grounded: subtle bob and forward lean
     const bobPhase = (Date.now() % 400) / 400;
     const bob = Math.sin(bobPhase * Math.PI * 2);
     p.squashX = 1 + bob * 0.01;
     p.squashY = 0.98 + bob * 0.02;
-    // Slight forward lean + wobble
-    const wobble = Math.sin((Date.now() % 600) / 600 * Math.PI * 2) * 0.02;
-    p.rotation = 5 * Math.PI / 180 + wobble;
+    const wobble = Math.sin(((Date.now() % 600) / 600) * Math.PI * 2) * 0.02;
+    p.rotation = (5 * Math.PI) / 180 + wobble;
   }
 }
 
-let frameCount = 0;
-
 export function resetSpawners() {
   frameCount = 0;
+  forceEasyFollowUp = false;
+  nextPhase2ObstacleOnTop = true;
 }
 
 export function update(state: GameState, canvasW: number, canvasH: number, dt: number): GameState {
@@ -186,7 +363,6 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   if (state.screenShake > 0) state.screenShake = Math.max(0, state.screenShake - dt * 0.01);
   if (state.coinFlash > 0) state.coinFlash = Math.max(0, state.coinFlash - dt * 0.005);
 
-  // Phase check
   if (state.phase === 1 && state.distance >= state.phaseThreshold) {
     state.phase = 2;
     state.playerBottom = makePlayer(80, lineY + PLAYER_SIZE / 2, false);
@@ -194,9 +370,8 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
 
   const skinColor = SKIN_COLORS[state.equippedSkin] || '#00ffcc';
 
-  // Player top physics
   const pt = state.playerTop;
-  pt.y = pt.y || (lineY - PLAYER_SIZE / 2);
+  pt.y = pt.y || lineY - PLAYER_SIZE / 2;
   const ptWasJumping = pt.isJumping;
   if (pt.isJumping) {
     pt.vy += GRAVITY;
@@ -209,20 +384,16 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   } else {
     pt.y = lineY - PLAYER_SIZE / 2;
   }
-  // Landing detection
   if (ptWasJumping && !pt.isJumping) {
     pt.landTimer = 100;
     pt.rotation = 0;
     addLandingParticles(state.particles, pt, lineY, skinColor);
   }
   updatePlayerAnim(pt, dt);
-
-  // Trail particles (every 3rd frame)
   if (frameCount % 3 === 0) {
     addTrailParticle(state.particles, pt, skinColor);
   }
 
-  // Player bottom physics
   if (state.playerBottom) {
     const pb = state.playerBottom;
     const pbWasJumping = pb.isJumping;
@@ -248,29 +419,44 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
-  // Spawn obstacles
-  const rightmostObs = state.obstacles.length > 0
-    ? Math.max(...state.obstacles.map(o => o.x))
-    : 0;
-  const minSpawn = canvasW + 20;
-  if (rightmostObs < minSpawn - OBSTACLE_MIN_GAP) {
-    state.obstacles.push(spawnObstacle(canvasW, lineY, true));
-    if (state.phase === 2) {
-      state.obstacles.push(spawnObstacle(canvasW, lineY, false));
+  const spawnProfile = getSpawnProfile(state.distance);
+  const visibleObstacleCount = state.obstacles.filter(
+    o => o.x + o.size / 2 >= 0 && o.x - o.size / 2 <= canvasW,
+  ).length;
+
+  if (visibleObstacleCount < MAX_VISIBLE_OBSTACLES) {
+    const spawnOnTop = state.phase === 1 ? true : nextPhase2ObstacleOnTop;
+    const candidate = createObstacle(canvasW, lineY, spawnOnTop, state.distance, forceEasyFollowUp);
+    const requiredGapPx = Math.max(
+      MIN_OBSTACLE_SPACING_PX,
+      forceEasyFollowUp ? spawnProfile.easyGapPx : spawnProfile.gapPx,
+    );
+    const rightmostObstacleRightEdge = state.obstacles.length > 0
+      ? Math.max(...state.obstacles.map(o => o.x + o.size / 2))
+      : Number.NEGATIVE_INFINITY;
+    const hasEnoughGap = state.obstacles.length === 0
+      || rightmostObstacleRightEdge <= candidate.x - candidate.size / 2 - requiredGapPx;
+
+    if (hasEnoughGap) {
+      state.obstacles.push(candidate);
+      forceEasyFollowUp = isHardObstacle(candidate);
+      if (state.phase === 2) {
+        nextPhase2ObstacleOnTop = !nextPhase2ObstacleOnTop;
+      }
     }
   }
 
-  // Spawn coins
-  if (Math.random() < 0.02) {
-    state.coinItems.push(spawnCoin(canvasW, lineY, state.phase));
+  if (state.coinItems.length < 2 && Math.random() < 0.012) {
+    const safeCoin = spawnSafeCoin(state, canvasW, lineY);
+    if (safeCoin) {
+      state.coinItems.push(safeCoin);
+    }
   }
 
-  // Move obstacles
   state.obstacles = state.obstacles
     .map(o => ({ ...o, x: o.x - effectiveSpeed }))
-    .filter(o => o.x > -50);
+    .filter(o => o.x > -60);
 
-  // Move coins with magnet
   const magnet = state.activePowers.find(p => p.type === 'magnet');
   state.coinItems = state.coinItems
     .map(c => {
@@ -290,7 +476,6 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     })
     .filter(c => c.x > -50 && !c.collected);
 
-  // Coin collection
   for (const coin of state.coinItems) {
     if (coin.collected) continue;
     const players = [pt, state.playerBottom].filter(Boolean) as Player[];
@@ -307,7 +492,6 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
-  // Collision detection
   for (const obs of state.obstacles) {
     const players = obs.isTop ? [pt] : (state.playerBottom ? [state.playerBottom] : []);
     for (const p of players) {
@@ -338,7 +522,6 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if (state.screen === 'gameover') break;
   }
 
-  // Update particles
   state.particles = state.particles
     .map(p => ({
       ...p,
@@ -360,7 +543,8 @@ export function render(
   const h = canvasH - BANNER_HEIGHT;
   const lineY = h / 2;
 
-  let shakeX = 0, shakeY = 0;
+  let shakeX = 0;
+  let shakeY = 0;
   if (state.screenShake > 0) {
     const intensity = state.screenShake * 8;
     shakeX = (Math.random() - 0.5) * intensity;
@@ -381,7 +565,6 @@ export function render(
     ctx.restore();
   }
 
-  // Grid
   ctx.strokeStyle = 'rgba(255,255,255,0.03)';
   ctx.lineWidth = 1;
   for (let x = (frameCount * 2) % 60; x < canvasW; x += 60) {
@@ -391,7 +574,6 @@ export function render(
     ctx.stroke();
   }
 
-  // Glowing line
   ctx.shadowColor = LINE_COLOR;
   ctx.shadowBlur = 20;
   ctx.strokeStyle = LINE_COLOR;
@@ -412,8 +594,7 @@ export function render(
   const skinColor = SKIN_COLORS[state.equippedSkin] || '#00ffcc';
 
   if (state.screen === 'menu') {
-    // Idle breathing player on menu
-    const breathe = 0.98 + 0.04 * Math.sin(Date.now() / 800 * Math.PI);
+    const breathe = 0.98 + 0.04 * Math.sin((Date.now() / 800) * Math.PI);
     const px = canvasW / 2;
     const py = lineY - PLAYER_SIZE / 2;
     ctx.save();
@@ -428,7 +609,6 @@ export function render(
     return;
   }
 
-  // Draw players with squash/stretch/rotation
   const drawPlayer = (p: Player) => {
     ctx.save();
     ctx.translate(p.x, p.y);
@@ -451,11 +631,9 @@ export function render(
   drawPlayer(state.playerTop);
   if (state.playerBottom) drawPlayer(state.playerBottom);
 
-  // Draw obstacles with ground shadow
   for (const obs of state.obstacles) {
     ctx.save();
 
-    // Ground shadow
     ctx.save();
     ctx.globalAlpha = 0.25;
     ctx.fillStyle = '#ff3366';
@@ -521,7 +699,6 @@ export function render(
     ctx.restore();
   }
 
-  // Draw coins
   for (const coin of state.coinItems) {
     if (coin.collected) continue;
     ctx.save();
@@ -547,7 +724,6 @@ export function render(
     ctx.restore();
   }
 
-  // Draw particles
   for (const p of state.particles) {
     ctx.save();
     ctx.globalAlpha = p.life / p.maxLife;
@@ -558,7 +734,6 @@ export function render(
     ctx.restore();
   }
 
-  // Active power-up indicators
   if (state.activePowers.length > 0) {
     ctx.save();
     ctx.font = '11px monospace';
@@ -574,7 +749,6 @@ export function render(
     ctx.restore();
   }
 
-  // Phase 2 indicator
   if (state.phase === 2 && state.distance < state.phaseThreshold + 100) {
     ctx.save();
     ctx.globalAlpha = Math.max(0, 1 - (state.distance - state.phaseThreshold) / 100);
@@ -585,9 +759,8 @@ export function render(
     ctx.restore();
   }
 
-  ctx.restore(); // end shake
+  ctx.restore();
 
-  // Banner ad area
   ctx.fillStyle = '#1a1a2e';
   ctx.fillRect(0, h, canvasW, BANNER_HEIGHT);
   if (!state.removeAds) {
@@ -599,7 +772,7 @@ export function render(
 }
 
 function drawStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, spikes: number, outerR: number, innerR: number) {
-  let rot = Math.PI / 2 * 3;
+  let rot = (Math.PI / 2) * 3;
   const step = Math.PI / spikes;
   ctx.beginPath();
   ctx.moveTo(cx, cy - outerR);
@@ -618,7 +791,6 @@ export function handleInput(state: GameState): GameState {
 
   const pt = state.playerTop;
   if (!pt.isJumping) {
-    // Jump anticipation — quick squash then launch
     pt.anticipation = 1;
     pt.vy = JUMP_FORCE;
     pt.isJumping = true;
