@@ -433,26 +433,62 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
-  const spawnProfile = getSpawnProfile(state.distance);
   const visibleObstacleCount = state.obstacles.filter(
     o => o.x + o.size / 2 >= 0 && o.x - o.size / 2 <= canvasW,
   ).length;
 
   if (visibleObstacleCount < MAX_VISIBLE_OBSTACLES) {
+    const mustBeEasy = forceEasyFollowUp || patternGapPending;
     const spawnOnTop = state.phase === 1 ? true : nextPhase2ObstacleOnTop;
-    const candidate = createObstacle(canvasW, lineY, spawnOnTop, state.distance, forceEasyFollowUp);
-    const requiredGapPx = Math.max(
-      MIN_OBSTACLE_SPACING_PX,
-      forceEasyFollowUp ? spawnProfile.easyGapPx : spawnProfile.gapPx,
-    );
+
+    // First obstacle is always a small triangle
+    let candidate: Obstacle;
+    if (isFirstObstacle) {
+      candidate = {
+        x: canvasW + OBSTACLE_SPAWN_X_OFFSET,
+        y: (canvasH - BANNER_HEIGHT) / 2 - 15,
+        type: 'triangle',
+        size: 28,
+        isTop: true,
+      };
+    } else {
+      candidate = createObstacle(canvasW, (canvasH - BANNER_HEIGHT) / 2, spawnOnTop, state.distance, mustBeEasy);
+    }
+
+    // Determine required gap based on phase + pattern state
+    let requiredGapPx: number;
+    if (patternGapPending) {
+      // Long gap after a burst
+      requiredGapPx = spawnProfile.maxGap * 1.3;
+    } else {
+      requiredGapPx = randomBetween(spawnProfile.minGap, spawnProfile.maxGap);
+    }
+
+    // Enforce safe spawn zone at game start
+    if (isFirstObstacle) {
+      requiredGapPx = Math.max(requiredGapPx, SAFE_SPAWN_ZONE);
+    }
+
     const rightmostObstacleRightEdge = state.obstacles.length > 0
       ? Math.max(...state.obstacles.map(o => o.x + o.size / 2))
-      : Number.NEGATIVE_INFINITY;
+      : state.playerTop.x - SAFE_SPAWN_ZONE; // ensure first obstacle respects safe zone
     const hasEnoughGap = state.obstacles.length === 0
       || rightmostObstacleRightEdge <= candidate.x - candidate.size / 2 - requiredGapPx;
 
     if (hasEnoughGap) {
       state.obstacles.push(candidate);
+      isFirstObstacle = false;
+
+      // Pattern/rhythm system
+      if (patternGapPending) {
+        patternGapPending = false;
+        patternCount = 0;
+      }
+      patternCount++;
+      if (patternCount >= spawnProfile.maxBurst) {
+        patternGapPending = true;
+      }
+
       forceEasyFollowUp = isHardObstacle(candidate);
       if (state.phase === 2) {
         nextPhase2ObstacleOnTop = !nextPhase2ObstacleOnTop;
