@@ -71,4 +71,6 @@ export interface GameState {
   equippedSkin: string;
   equippedTrail: string;
   equippedDeath: string;
+  screenShake: number;
+  coinFlash: number;
 }
