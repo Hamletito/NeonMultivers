@@ -543,15 +543,17 @@ export function render(
   const h = canvasH - BANNER_HEIGHT;
   const lineY = h / 2;
 
+  // Shake is strictly scoped to playing state
   let shakeX = 0;
   let shakeY = 0;
-  if (state.screenShake > 0) {
+  if (state.screen === 'playing' && state.screenShake > 0) {
     const intensity = state.screenShake * 8;
     shakeX = (Math.random() - 0.5) * intensity;
     shakeY = (Math.random() - 0.5) * intensity;
   }
 
   ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // hard reset
   ctx.translate(shakeX, shakeY);
 
   ctx.fillStyle = BG_COLOR;
