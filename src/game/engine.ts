@@ -336,6 +336,12 @@ export function resetSpawners() {
   frameCount = 0;
   forceEasyFollowUp = false;
   nextPhase2ObstacleOnTop = true;
+  isFirstObstacle = true;
+  lastMilestone = 0;
+  milestoneFlashTimer = 0;
+  milestoneFlashScore = 0;
+  patternCount = 0;
+  patternGapPending = false;
 }
 
 export function update(state: GameState, canvasW: number, canvasH: number, dt: number): GameState {
