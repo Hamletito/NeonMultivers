@@ -90,9 +90,10 @@ function addParticles(particles: Particle[], x: number, y: number, color: string
 }
 
 function checkCollision(player: Player, obs: Obstacle): boolean {
+  const shrink = 0.85; // 15% smaller hitbox for forgiveness
   const dx = Math.abs(player.x - obs.x);
   const dy = Math.abs(player.y - obs.y);
-  return dx < (player.size / 2 + obs.size / 2) && dy < (player.size / 2 + obs.size / 2);
+  return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + obs.size / 2) * shrink;
 }
 
 let lastObstacleX = 0;
