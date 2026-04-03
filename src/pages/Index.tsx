@@ -1,16 +1,88 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useCallback } from 'react';
+import GameCanvas from '../components/GameCanvas';
+import MenuScreen from '../components/MenuScreen';
+import HUD from '../components/HUD';
+import GameOverScreen from '../components/GameOverScreen';
+import ShopScreen from '../components/ShopScreen';
+import PauseOverlay from '../components/PauseOverlay';
+import { GameState, ShopItem } from '../game/types';
+import { createInitialState, resetForNewGame } from '../game/engine';
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
+  const [state, setState] = useState<GameState>(createInitialState);
+
+  const handlePlay = useCallback(() => {
+    setState(s => resetForNewGame(s));
+  }, []);
+
+  const handlePause = useCallback(() => {
+    setState(s => ({ ...s, screen: 'paused' }));
+  }, []);
+
+  const handleResume = useCallback(() => {
+    setState(s => ({ ...s, screen: 'playing' }));
+  }, []);
+
+  const handleMenu = useCallback(() => {
+    setState(s => ({ ...s, screen: 'menu' }));
+  }, []);
+
+  const handleShop = useCallback(() => {
+    setState(s => ({ ...s, screen: 'shop' }));
+  }, []);
+
+  const handleRevive = useCallback(() => {
+    setState(s => {
+      const newState = { ...s, screen: 'playing' as const, freeReviveUsed: true, hasShield: true };
+      // Clear nearby obstacles
+      newState.obstacles = newState.obstacles.filter(o => o.x > s.playerTop.x + 200);
+      return newState;
+    });
+  }, []);
+
+  const handleBuy = useCallback((item: ShopItem) => {
+    setState(s => {
+      if (s.totalCoins < item.price) return s;
+      const newCoins = s.totalCoins - item.price;
+      localStorage.setItem('coins', String(newCoins));
+      return { ...s, coins: newCoins, totalCoins: newCoins };
+    });
+  }, []);
+
+  const handleEquip = useCallback((item: ShopItem) => {
+    if (item.type === 'skin') {
+      localStorage.setItem('equippedSkin', item.id);
+      setState(s => ({ ...s, equippedSkin: item.id }));
+    }
+  }, []);
+
+  const handleRemoveAds = useCallback(() => {
+    localStorage.setItem('removeAds', 'true');
+    setState(s => ({ ...s, removeAds: true }));
+  }, []);
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="w-full h-screen overflow-hidden bg-background">
+      <GameCanvas state={state} onStateChange={setState} />
+      <MenuScreen state={state} onPlay={handlePlay} onShop={handleShop} />
+      <HUD state={state} onPause={handlePause} />
+      <GameOverScreen state={state} onRevive={handleRevive} onMenu={handleMenu} />
+      <PauseOverlay visible={state.screen === 'paused'} onResume={handleResume} onMenu={handleMenu} />
+      {state.screen === 'shop' && (
+        <ShopScreen
+          coins={state.totalCoins}
+          removeAds={state.removeAds}
+          equippedSkin={state.equippedSkin}
+          onBuy={handleBuy}
+          onEquip={handleEquip}
+          onRemoveAds={handleRemoveAds}
+          onBack={handleMenu}
+        />
+      )}
+      {/* Ad banner placeholder */}
+      <div id="banner-ad" className="fixed bottom-0 left-0 right-0 h-[60px] z-10" />
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
