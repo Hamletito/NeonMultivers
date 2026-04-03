@@ -354,12 +354,25 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   const spawnProfile = getSpawnProfile(state.distance);
   state.speed = Math.min(MAX_SPEED, state.baseSpeed * spawnProfile.speedMult + state.distance * SPEED_INCREMENT * 0.3);
 
+  let effectiveSpeed = state.speed;
+  const slowmo = state.activePowers.find(p => p.type === 'slowmo');
+  if (slowmo) effectiveSpeed *= 0.5;
+
   state.activePowers = state.activePowers
     .map(p => ({ ...p, remaining: p.remaining - dt }))
     .filter(p => p.remaining > 0);
 
   state.distance += effectiveSpeed * 0.1;
   state.score = Math.floor(state.distance);
+
+  // Milestone flash every 100m
+  const currentMilestone = Math.floor(state.distance / 100) * 100;
+  if (currentMilestone > lastMilestone && currentMilestone > 0) {
+    lastMilestone = currentMilestone;
+    milestoneFlashTimer = 1.5; // seconds
+    milestoneFlashScore = currentMilestone;
+  }
+  if (milestoneFlashTimer > 0) milestoneFlashTimer = Math.max(0, milestoneFlashTimer - dt / 1000);
 
   if (state.screenShake > 0) state.screenShake = Math.max(0, state.screenShake - dt * 0.01);
   if (state.coinFlash > 0) state.coinFlash = Math.max(0, state.coinFlash - dt * 0.005);
