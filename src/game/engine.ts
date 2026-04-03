@@ -172,16 +172,15 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
-  // Spawn obstacles
+  // Spawn obstacles — enforce minimum gap of OBSTACLE_MIN_GAP
   const rightmostObs = state.obstacles.length > 0
     ? Math.max(...state.obstacles.map(o => o.x))
     : 0;
-  if (rightmostObs < canvasW + 50 || frameCount % Math.max(30, 60 - Math.floor(state.distance / 50)) === 0) {
-    if (rightmostObs < canvasW - OBSTACLE_MIN_GAP + Math.random() * 100) {
-      state.obstacles.push(spawnObstacle(canvasW, lineY, true));
-      if (state.phase === 2) {
-        state.obstacles.push(spawnObstacle(canvasW, lineY, false));
-      }
+  const minSpawn = canvasW + 20;
+  if (rightmostObs < minSpawn - OBSTACLE_MIN_GAP) {
+    state.obstacles.push(spawnObstacle(canvasW, lineY, true));
+    if (state.phase === 2) {
+      state.obstacles.push(spawnObstacle(canvasW, lineY, false));
     }
   }
 
