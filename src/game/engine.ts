@@ -350,11 +350,9 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   const lineY = (canvasH - BANNER_HEIGHT) / 2;
   frameCount++;
 
-  state.speed = Math.min(MAX_SPEED, state.baseSpeed + state.distance * SPEED_INCREMENT);
-
-  let effectiveSpeed = state.speed;
-  const slowmo = state.activePowers.find(p => p.type === 'slowmo');
-  if (slowmo) effectiveSpeed *= 0.5;
+  // Speed scales by phase profile, not just raw distance
+  const spawnProfile = getSpawnProfile(state.distance);
+  state.speed = Math.min(MAX_SPEED, state.baseSpeed * spawnProfile.speedMult + state.distance * SPEED_INCREMENT * 0.3);
 
   state.activePowers = state.activePowers
     .map(p => ({ ...p, remaining: p.remaining - dt }))
