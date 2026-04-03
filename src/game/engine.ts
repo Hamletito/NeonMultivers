@@ -811,6 +811,20 @@ export function render(
     ctx.restore();
   }
 
+  // Milestone flash
+  if (milestoneFlashTimer > 0 && state.screen === 'playing') {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, milestoneFlashTimer);
+    ctx.fillStyle = '#00ffcc';
+    ctx.shadowColor = '#00ffcc';
+    ctx.shadowBlur = 30;
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${milestoneFlashScore}m`, canvasW / 2, h / 2 - 80);
+    ctx.restore();
+  }
+
   ctx.restore();
 
   ctx.fillStyle = '#1a1a2e';
