@@ -5,6 +5,15 @@ import {
   COIN_RADIUS, BANNER_HEIGHT, SKIN_COLORS,
 } from './constants';
 
+function makePlayer(x: number, y: number, isAboveLine: boolean): Player {
+  return {
+    x, y, size: PLAYER_SIZE, vy: 0,
+    isJumping: false, isAboveLine,
+    squashX: 1, squashY: 1, rotation: 0,
+    anticipation: 0, landTimer: 0, wasJumping: false,
+  };
+}
+
 export function createInitialState(): GameState {
   return {
     screen: 'menu',
@@ -17,7 +26,7 @@ export function createInitialState(): GameState {
     baseSpeed: BASE_SPEED,
     phase: 1,
     phaseThreshold: PHASE2_DISTANCE,
-    playerTop: { x: 80, y: 0, size: PLAYER_SIZE, vy: 0, isJumping: false, isAboveLine: true },
+    playerTop: makePlayer(80, 0, true),
     playerBottom: null,
     obstacles: [],
     coinItems: [],
@@ -43,7 +52,7 @@ export function resetForNewGame(state: GameState): GameState {
     speed: BASE_SPEED,
     baseSpeed: BASE_SPEED,
     phase: 1,
-    playerTop: { x: 80, y: 0, size: PLAYER_SIZE, vy: 0, isJumping: false, isAboveLine: true },
+    playerTop: makePlayer(80, 0, true),
     playerBottom: null,
     obstacles: [],
     coinItems: [],
@@ -59,11 +68,8 @@ export function resetForNewGame(state: GameState): GameState {
 function spawnObstacle(canvasW: number, lineY: number, isTop: boolean): Obstacle {
   const types: Obstacle['type'][] = ['triangle', 'circle', 'star', 'spike', 'diamond'];
   const type = types[Math.floor(Math.random() * types.length)];
-  const size = 30 + Math.random() * 20; // 30-50px consistent height
-  // Position so the base sits exactly on the line
-  const y = isTop
-    ? lineY - size / 2  // top half: center above line so bottom edge touches line
-    : lineY + size / 2; // bottom half: center below line so top edge touches line
+  const size = 30 + Math.random() * 20;
+  const y = isTop ? lineY - size / 2 : lineY + size / 2;
   return { x: canvasW + 50, y, type, size, isTop };
 }
 
@@ -81,28 +87,80 @@ function addParticles(particles: Particle[], x: number, y: number, color: string
       x, y,
       vx: (Math.random() - 0.5) * 6,
       vy: (Math.random() - 0.5) * 6,
-      life: 1,
-      maxLife: 1,
-      color,
+      life: 1, maxLife: 1, color,
       size: 2 + Math.random() * 3,
     });
   }
 }
 
+function addTrailParticle(particles: Particle[], p: Player, color: string) {
+  particles.push({
+    x: p.x - p.size / 2 - 2,
+    y: p.y + (Math.random() - 0.5) * p.size * 0.5,
+    vx: -1 - Math.random(),
+    vy: (Math.random() - 0.5) * 0.5,
+    life: 0.6, maxLife: 0.6, color,
+    size: 1.5 + Math.random() * 2,
+  });
+}
+
+function addLandingParticles(particles: Particle[], p: Player, lineY: number, color: string) {
+  const groundY = p.isAboveLine ? lineY : lineY;
+  for (let i = 0; i < 8; i++) {
+    particles.push({
+      x: p.x + (Math.random() - 0.5) * p.size,
+      y: groundY,
+      vx: (Math.random() - 0.5) * 4,
+      vy: p.isAboveLine ? -(Math.random() * 2) : (Math.random() * 2),
+      life: 0.5, maxLife: 0.5, color,
+      size: 1.5 + Math.random() * 2,
+    });
+  }
+}
+
 function checkCollision(player: Player, obs: Obstacle): boolean {
-  const shrink = 0.85; // 15% smaller hitbox for forgiveness
+  const shrink = 0.85;
   const dx = Math.abs(player.x - obs.x);
   const dy = Math.abs(player.y - obs.y);
   return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + obs.size / 2) * shrink;
 }
 
-let lastObstacleX = 0;
-let lastCoinX = 0;
+function updatePlayerAnim(p: Player, dt: number) {
+  // Land squash decay
+  if (p.landTimer > 0) {
+    p.landTimer = Math.max(0, p.landTimer - dt);
+    const t = p.landTimer / 100; // 0→1 during squash
+    p.squashX = 1 + 0.2 * t; // wider
+    p.squashY = 1 - 0.15 * t; // shorter
+  } else if (p.anticipation > 0) {
+    // Jump anticipation squash (before launch)
+    p.squashX = 1 + 0.1 * p.anticipation;
+    p.squashY = 1 - 0.15 * p.anticipation;
+    p.anticipation = Math.max(0, p.anticipation - dt / 80);
+  } else if (p.isJumping) {
+    // Airborne: stretch vertically, gentle rotation
+    const stretchFactor = Math.min(1, Math.abs(p.vy) / 10);
+    p.squashX = 1 - 0.12 * stretchFactor;
+    p.squashY = 1 + 0.18 * stretchFactor;
+    // Gentle tilt up to 15° based on vertical velocity
+    const maxRot = 15 * Math.PI / 180;
+    const dir = p.isAboveLine ? 1 : -1;
+    p.rotation = dir * (p.vy / Math.abs(JUMP_FORCE)) * maxRot * 0.5;
+  } else {
+    // Grounded: subtle bob and forward lean
+    const bobPhase = (Date.now() % 400) / 400;
+    const bob = Math.sin(bobPhase * Math.PI * 2);
+    p.squashX = 1 + bob * 0.01;
+    p.squashY = 0.98 + bob * 0.02;
+    // Slight forward lean + wobble
+    const wobble = Math.sin((Date.now() % 600) / 600 * Math.PI * 2) * 0.02;
+    p.rotation = 5 * Math.PI / 180 + wobble;
+  }
+}
+
 let frameCount = 0;
 
 export function resetSpawners() {
-  lastObstacleX = 0;
-  lastCoinX = 0;
   frameCount = 0;
 }
 
@@ -112,15 +170,12 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   const lineY = (canvasH - BANNER_HEIGHT) / 2;
   frameCount++;
 
-  // Speed increase
   state.speed = Math.min(MAX_SPEED, state.baseSpeed + state.distance * SPEED_INCREMENT);
 
-  // Slow motion power
   let effectiveSpeed = state.speed;
   const slowmo = state.activePowers.find(p => p.type === 'slowmo');
   if (slowmo) effectiveSpeed *= 0.5;
 
-  // Update active powers
   state.activePowers = state.activePowers
     .map(p => ({ ...p, remaining: p.remaining - dt }))
     .filter(p => p.remaining > 0);
@@ -128,22 +183,21 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   state.distance += effectiveSpeed * 0.1;
   state.score = Math.floor(state.distance);
 
-  // Decay screen shake & coin flash
   if (state.screenShake > 0) state.screenShake = Math.max(0, state.screenShake - dt * 0.01);
   if (state.coinFlash > 0) state.coinFlash = Math.max(0, state.coinFlash - dt * 0.005);
 
   // Phase check
   if (state.phase === 1 && state.distance >= state.phaseThreshold) {
     state.phase = 2;
-    state.playerBottom = {
-      x: 80, y: lineY + PLAYER_SIZE / 2, size: PLAYER_SIZE,
-      vy: 0, isJumping: false, isAboveLine: false,
-    };
+    state.playerBottom = makePlayer(80, lineY + PLAYER_SIZE / 2, false);
   }
+
+  const skinColor = SKIN_COLORS[state.equippedSkin] || '#00ffcc';
 
   // Player top physics
   const pt = state.playerTop;
   pt.y = pt.y || (lineY - PLAYER_SIZE / 2);
+  const ptWasJumping = pt.isJumping;
   if (pt.isJumping) {
     pt.vy += GRAVITY;
     pt.y += pt.vy;
@@ -155,10 +209,23 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   } else {
     pt.y = lineY - PLAYER_SIZE / 2;
   }
+  // Landing detection
+  if (ptWasJumping && !pt.isJumping) {
+    pt.landTimer = 100;
+    pt.rotation = 0;
+    addLandingParticles(state.particles, pt, lineY, skinColor);
+  }
+  updatePlayerAnim(pt, dt);
 
-  // Player bottom physics (mirrored gravity)
+  // Trail particles (every 3rd frame)
+  if (frameCount % 3 === 0) {
+    addTrailParticle(state.particles, pt, skinColor);
+  }
+
+  // Player bottom physics
   if (state.playerBottom) {
     const pb = state.playerBottom;
+    const pbWasJumping = pb.isJumping;
     if (pb.isJumping) {
       pb.vy -= GRAVITY;
       pb.y += pb.vy;
@@ -170,9 +237,18 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     } else {
       pb.y = lineY + PLAYER_SIZE / 2;
     }
+    if (pbWasJumping && !pb.isJumping) {
+      pb.landTimer = 100;
+      pb.rotation = 0;
+      addLandingParticles(state.particles, pb, lineY, skinColor);
+    }
+    updatePlayerAnim(pb, dt);
+    if (frameCount % 3 === 0) {
+      addTrailParticle(state.particles, pb, skinColor);
+    }
   }
 
-  // Spawn obstacles — enforce minimum gap of OBSTACLE_MIN_GAP
+  // Spawn obstacles
   const rightmostObs = state.obstacles.length > 0
     ? Math.max(...state.obstacles.map(o => o.x))
     : 0;
@@ -225,7 +301,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
         coin.collected = true;
         state.coins++;
         state.totalCoins++;
-        state.coinFlash = 1; // trigger flash
+        state.coinFlash = 1;
         addParticles(state.particles, coin.x, coin.y, '#facc15', 12);
       }
     }
@@ -241,11 +317,10 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
           state.obstacles = state.obstacles.filter(o => o !== obs);
           addParticles(state.particles, p.x, p.y, '#00ffcc', 15);
         } else {
-          // Death — screen shake
           state.screenShake = 1;
-          addParticles(state.particles, p.x, p.y, SKIN_COLORS[state.equippedSkin] || '#00ffcc', 30);
+          addParticles(state.particles, p.x, p.y, skinColor, 30);
           if (state.playerBottom) {
-            addParticles(state.particles, state.playerBottom.x, state.playerBottom.y, SKIN_COLORS[state.equippedSkin] || '#00ffcc', 30);
+            addParticles(state.particles, state.playerBottom.x, state.playerBottom.y, skinColor, 30);
           }
           state.screen = 'gameover';
           const distCoins = Math.floor(state.distance / 10);
@@ -285,7 +360,6 @@ export function render(
   const h = canvasH - BANNER_HEIGHT;
   const lineY = h / 2;
 
-  // Screen shake offset
   let shakeX = 0, shakeY = 0;
   if (state.screenShake > 0) {
     const intensity = state.screenShake * 8;
@@ -296,11 +370,9 @@ export function render(
   ctx.save();
   ctx.translate(shakeX, shakeY);
 
-  // Background
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(-10, -10, canvasW + 20, canvasH + 20);
 
-  // Coin flash overlay
   if (state.coinFlash > 0) {
     ctx.save();
     ctx.globalAlpha = state.coinFlash * 0.15;
@@ -309,7 +381,7 @@ export function render(
     ctx.restore();
   }
 
-  // Subtle grid lines
+  // Grid
   ctx.strokeStyle = 'rgba(255,255,255,0.03)';
   ctx.lineWidth = 1;
   for (let x = (frameCount * 2) % 60; x < canvasW; x += 60) {
@@ -330,7 +402,6 @@ export function render(
   ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Glow spread
   const grad = ctx.createLinearGradient(0, lineY - 30, 0, lineY + 30);
   grad.addColorStop(0, 'rgba(0,255,204,0)');
   grad.addColorStop(0.5, 'rgba(0,255,204,0.08)');
@@ -338,25 +409,40 @@ export function render(
   ctx.fillStyle = grad;
   ctx.fillRect(0, lineY - 30, canvasW, 60);
 
+  const skinColor = SKIN_COLORS[state.equippedSkin] || '#00ffcc';
+
   if (state.screen === 'menu') {
+    // Idle breathing player on menu
+    const breathe = 0.98 + 0.04 * Math.sin(Date.now() / 800 * Math.PI);
+    const px = canvasW / 2;
+    const py = lineY - PLAYER_SIZE / 2;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.scale(breathe, breathe);
+    ctx.shadowColor = skinColor;
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-PLAYER_SIZE / 2, -PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+    ctx.restore();
     ctx.restore();
     return;
   }
 
-  const skinColor = SKIN_COLORS[state.equippedSkin] || '#00ffcc';
-
-  // Draw players
+  // Draw players with squash/stretch/rotation
   const drawPlayer = (p: Player) => {
     ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rotation);
+    ctx.scale(p.squashX, p.squashY);
     ctx.shadowColor = skinColor;
     ctx.shadowBlur = 15;
     ctx.fillStyle = skinColor;
-    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
     if (state.hasShield) {
       ctx.strokeStyle = 'rgba(0,255,204,0.6)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * 0.8, 0, Math.PI * 2);
+      ctx.arc(0, 0, p.size * 0.8, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();
@@ -368,33 +454,29 @@ export function render(
   // Draw obstacles with ground shadow
   for (const obs of state.obstacles) {
     ctx.save();
-    
-    // Ground shadow — ellipse on the line under the obstacle
-    const shadowY = obs.isTop ? lineY : lineY;
+
+    // Ground shadow
     ctx.save();
     ctx.globalAlpha = 0.25;
     ctx.fillStyle = '#ff3366';
     ctx.beginPath();
-    ctx.ellipse(obs.x, shadowY, obs.size / 2 + 4, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(obs.x, lineY, obs.size / 2 + 4, 4, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
     ctx.fillStyle = '#ff3366';
     ctx.shadowColor = '#ff3366';
     ctx.shadowBlur = 10;
-    
-    // All shapes drawn so their base sits on the line
+
     const half = obs.size / 2;
     switch (obs.type) {
       case 'triangle':
         ctx.beginPath();
         if (obs.isTop) {
-          // Base at bottom (on line), point up
           ctx.moveTo(obs.x, obs.y - half);
           ctx.lineTo(obs.x + half, obs.y + half);
           ctx.lineTo(obs.x - half, obs.y + half);
         } else {
-          // Base at top (on line), point down
           ctx.moveTo(obs.x, obs.y + half);
           ctx.lineTo(obs.x + half, obs.y - half);
           ctx.lineTo(obs.x - half, obs.y - half);
@@ -439,18 +521,16 @@ export function render(
     ctx.restore();
   }
 
-  // Draw coins — larger with glow
+  // Draw coins
   for (const coin of state.coinItems) {
     if (coin.collected) continue;
     ctx.save();
-    // Outer glow
     ctx.shadowColor = '#facc15';
     ctx.shadowBlur = 18;
     ctx.fillStyle = '#facc15';
     ctx.beginPath();
     ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
     ctx.fill();
-    // Inner highlight
     const coinGrad = ctx.createRadialGradient(coin.x - 2, coin.y - 2, 1, coin.x, coin.y, coin.radius);
     coinGrad.addColorStop(0, 'rgba(255,255,255,0.6)');
     coinGrad.addColorStop(0.5, 'rgba(250,204,21,0.8)');
@@ -459,7 +539,6 @@ export function render(
     ctx.beginPath();
     ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
     ctx.fill();
-    // $ symbol
     ctx.fillStyle = '#0f0f1a';
     ctx.font = `bold ${coin.radius}px monospace`;
     ctx.textAlign = 'center';
@@ -471,10 +550,10 @@ export function render(
   // Draw particles
   for (const p of state.particles) {
     ctx.save();
-    ctx.globalAlpha = p.life;
+    ctx.globalAlpha = p.life / p.maxLife;
     ctx.fillStyle = p.color;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, p.size * (p.life / p.maxLife), 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -506,9 +585,9 @@ export function render(
     ctx.restore();
   }
 
-  ctx.restore(); // end shake transform
+  ctx.restore(); // end shake
 
-  // Banner ad area (outside shake)
+  // Banner ad area
   ctx.fillStyle = '#1a1a2e';
   ctx.fillRect(0, h, canvasW, BANNER_HEIGHT);
   if (!state.removeAds) {
@@ -539,6 +618,8 @@ export function handleInput(state: GameState): GameState {
 
   const pt = state.playerTop;
   if (!pt.isJumping) {
+    // Jump anticipation — quick squash then launch
+    pt.anticipation = 1;
     pt.vy = JUMP_FORCE;
     pt.isJumping = true;
   } else {
@@ -548,6 +629,7 @@ export function handleInput(state: GameState): GameState {
   if (state.playerBottom) {
     const pb = state.playerBottom;
     if (!pb.isJumping) {
+      pb.anticipation = 1;
       pb.vy = -JUMP_FORCE;
       pb.isJumping = true;
     } else {

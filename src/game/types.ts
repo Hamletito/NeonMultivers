@@ -4,7 +4,14 @@ export interface Player {
   size: number;
   vy: number;
   isJumping: boolean;
-  isAboveLine: boolean; // true = top player, false would be bottom mirror
+  isAboveLine: boolean;
+  // Animation state
+  squashX: number;   // width scale (1 = normal)
+  squashY: number;   // height scale (1 = normal)
+  rotation: number;  // radians
+  anticipation: number; // 0-1, jump anticipation squash timer
+  landTimer: number;    // ms remaining of land squash
+  wasJumping: boolean;  // track landing frame
 }
 
 export interface Obstacle {
@@ -12,7 +19,7 @@ export interface Obstacle {
   y: number;
   type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond';
   size: number;
-  isTop: boolean; // which half
+  isTop: boolean;
 }
 
 export interface Coin {
@@ -35,7 +42,7 @@ export interface Particle {
 
 export interface PowerUpActive {
   type: 'shield' | 'slowmo' | 'magnet';
-  remaining: number; // ms remaining
+  remaining: number;
 }
 
 export interface ShopItem {
