@@ -10,7 +10,7 @@ export interface Player {
 export interface Obstacle {
   x: number;
   y: number;
-  type: 'triangle' | 'circle' | 'star' | 'spike';
+  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond';
   size: number;
   isTop: boolean; // which half
 }
@@ -71,4 +71,6 @@ export interface GameState {
   equippedSkin: string;
   equippedTrail: string;
   equippedDeath: string;
+  screenShake: number;
+  coinFlash: number;
 }

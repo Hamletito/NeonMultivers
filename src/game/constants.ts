@@ -7,9 +7,9 @@ export const JUMP_FORCE = -12;
 export const BASE_SPEED = 4;
 export const SPEED_INCREMENT = 0.0003;
 export const MAX_SPEED = 14;
-export const PHASE2_DISTANCE = 500;
+export const PHASE2_DISTANCE = 200;
 export const OBSTACLE_MIN_GAP = 180;
-export const COIN_RADIUS = 10;
+export const COIN_RADIUS = 14;
 export const BANNER_HEIGHT = 60;
 
 export const SKIN_COLORS: Record<string, string> = {

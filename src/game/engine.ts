@@ -29,6 +29,8 @@ export function createInitialState(): GameState {
     equippedSkin: localStorage.getItem('equippedSkin') || 'default',
     equippedTrail: localStorage.getItem('equippedTrail') || '',
     equippedDeath: localStorage.getItem('equippedDeath') || '',
+    screenShake: 0,
+    coinFlash: 0,
   };
 }
 
@@ -49,11 +51,13 @@ export function resetForNewGame(state: GameState): GameState {
     activePowers: [],
     hasShield: false,
     freeReviveUsed: false,
+    screenShake: 0,
+    coinFlash: 0,
   };
 }
 
 function spawnObstacle(canvasW: number, lineY: number, isTop: boolean): Obstacle {
-  const types: Obstacle['type'][] = ['triangle', 'circle', 'star', 'spike'];
+  const types: Obstacle['type'][] = ['triangle', 'circle', 'star', 'spike', 'diamond'];
   const type = types[Math.floor(Math.random() * types.length)];
   const size = 20 + Math.random() * 15;
   const y = isTop
@@ -84,14 +88,10 @@ function addParticles(particles: Particle[], x: number, y: number, color: string
   }
 }
 
-function checkCollision(player: Player, obs: Obstacle, lineY: number): boolean {
-  const px = player.x;
-  const py = player.y;
-  const ps = player.size;
-  // Simple AABB
-  const dx = Math.abs(px - obs.x);
-  const dy = Math.abs(py - obs.y);
-  return dx < (ps / 2 + obs.size / 2) && dy < (ps / 2 + obs.size / 2);
+function checkCollision(player: Player, obs: Obstacle): boolean {
+  const dx = Math.abs(player.x - obs.x);
+  const dy = Math.abs(player.y - obs.y);
+  return dx < (player.size / 2 + obs.size / 2) && dy < (player.size / 2 + obs.size / 2);
 }
 
 let lastObstacleX = 0;
@@ -126,6 +126,10 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   state.distance += effectiveSpeed * 0.1;
   state.score = Math.floor(state.distance);
 
+  // Decay screen shake & coin flash
+  if (state.screenShake > 0) state.screenShake = Math.max(0, state.screenShake - dt * 0.01);
+  if (state.coinFlash > 0) state.coinFlash = Math.max(0, state.coinFlash - dt * 0.005);
+
   // Phase check
   if (state.phase === 1 && state.distance >= state.phaseThreshold) {
     state.phase = 2;
@@ -154,7 +158,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   if (state.playerBottom) {
     const pb = state.playerBottom;
     if (pb.isJumping) {
-      pb.vy -= GRAVITY; // inverted
+      pb.vy -= GRAVITY;
       pb.y += pb.vy;
       if (pb.y <= lineY + PLAYER_SIZE / 2) {
         pb.y = lineY + PLAYER_SIZE / 2;
@@ -189,21 +193,20 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     .map(o => ({ ...o, x: o.x - effectiveSpeed }))
     .filter(o => o.x > -50);
 
-  // Move coins
+  // Move coins with magnet
   const magnet = state.activePowers.find(p => p.type === 'magnet');
   state.coinItems = state.coinItems
     .map(c => {
       let newX = c.x - effectiveSpeed;
       let newY = c.y;
       if (magnet && !c.collected) {
-        // attract to nearest player
         const target = c.y < lineY ? pt : (state.playerBottom || pt);
         const dx = target.x - newX;
         const dy = target.y - newY;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 150) {
-          newX += dx * 0.1;
-          newY += dy * 0.1;
+        if (dist < 200) {
+          newX += dx * 0.15;
+          newY += dy * 0.15;
         }
       }
       return { ...c, x: newX, y: newY };
@@ -221,7 +224,8 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
         coin.collected = true;
         state.coins++;
         state.totalCoins++;
-        addParticles(state.particles, coin.x, coin.y, '#facc15', 8);
+        state.coinFlash = 1; // trigger flash
+        addParticles(state.particles, coin.x, coin.y, '#facc15', 12);
       }
     }
   }
@@ -230,19 +234,19 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   for (const obs of state.obstacles) {
     const players = obs.isTop ? [pt] : (state.playerBottom ? [state.playerBottom] : []);
     for (const p of players) {
-      if (checkCollision(p, obs, lineY)) {
+      if (checkCollision(p, obs)) {
         if (state.hasShield) {
           state.hasShield = false;
           state.obstacles = state.obstacles.filter(o => o !== obs);
           addParticles(state.particles, p.x, p.y, '#00ffcc', 15);
         } else {
-          // Death
-          addParticles(state.particles, p.x, p.y, SKIN_COLORS[state.equippedSkin] || '#00ffcc', 25);
+          // Death — screen shake
+          state.screenShake = 1;
+          addParticles(state.particles, p.x, p.y, SKIN_COLORS[state.equippedSkin] || '#00ffcc', 30);
           if (state.playerBottom) {
-            addParticles(state.particles, state.playerBottom.x, state.playerBottom.y, SKIN_COLORS[state.equippedSkin] || '#00ffcc', 25);
+            addParticles(state.particles, state.playerBottom.x, state.playerBottom.y, SKIN_COLORS[state.equippedSkin] || '#00ffcc', 30);
           }
           state.screen = 'gameover';
-          // Coins from distance
           const distCoins = Math.floor(state.distance / 10);
           state.coins += distCoins;
           state.totalCoins += distCoins;
@@ -280,9 +284,29 @@ export function render(
   const h = canvasH - BANNER_HEIGHT;
   const lineY = h / 2;
 
+  // Screen shake offset
+  let shakeX = 0, shakeY = 0;
+  if (state.screenShake > 0) {
+    const intensity = state.screenShake * 8;
+    shakeX = (Math.random() - 0.5) * intensity;
+    shakeY = (Math.random() - 0.5) * intensity;
+  }
+
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
   // Background
   ctx.fillStyle = BG_COLOR;
-  ctx.fillRect(0, 0, canvasW, canvasH);
+  ctx.fillRect(-10, -10, canvasW + 20, canvasH + 20);
+
+  // Coin flash overlay
+  if (state.coinFlash > 0) {
+    ctx.save();
+    ctx.globalAlpha = state.coinFlash * 0.15;
+    ctx.fillStyle = '#facc15';
+    ctx.fillRect(0, 0, canvasW, h);
+    ctx.restore();
+  }
 
   // Subtle grid lines
   ctx.strokeStyle = 'rgba(255,255,255,0.03)';
@@ -313,7 +337,10 @@ export function render(
   ctx.fillStyle = grad;
   ctx.fillRect(0, lineY - 30, canvasW, 60);
 
-  if (state.screen === 'menu') return;
+  if (state.screen === 'menu') {
+    ctx.restore();
+    return;
+  }
 
   const skinColor = SKIN_COLORS[state.equippedSkin] || '#00ffcc';
 
@@ -325,7 +352,7 @@ export function render(
     ctx.fillStyle = skinColor;
     ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
     if (state.hasShield) {
-      ctx.strokeStyle = 'rgba(0,255,204,0.5)';
+      ctx.strokeStyle = 'rgba(0,255,204,0.6)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size * 0.8, 0, Math.PI * 2);
@@ -369,25 +396,45 @@ export function render(
         ctx.closePath();
         ctx.fill();
         break;
+      case 'diamond':
+        ctx.beginPath();
+        ctx.moveTo(obs.x, obs.y - obs.size / 2);
+        ctx.lineTo(obs.x + obs.size / 2, obs.y);
+        ctx.lineTo(obs.x, obs.y + obs.size / 2);
+        ctx.lineTo(obs.x - obs.size / 2, obs.y);
+        ctx.closePath();
+        ctx.fill();
+        break;
     }
     ctx.restore();
   }
 
-  // Draw coins
+  // Draw coins — larger with glow
   for (const coin of state.coinItems) {
     if (coin.collected) continue;
     ctx.save();
-    ctx.fillStyle = '#facc15';
+    // Outer glow
     ctx.shadowColor = '#facc15';
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = '#facc15';
     ctx.beginPath();
     ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
     ctx.fill();
+    // Inner highlight
+    const coinGrad = ctx.createRadialGradient(coin.x - 2, coin.y - 2, 1, coin.x, coin.y, coin.radius);
+    coinGrad.addColorStop(0, 'rgba(255,255,255,0.6)');
+    coinGrad.addColorStop(0.5, 'rgba(250,204,21,0.8)');
+    coinGrad.addColorStop(1, '#d97706');
+    ctx.fillStyle = coinGrad;
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+    ctx.fill();
+    // $ symbol
     ctx.fillStyle = '#0f0f1a';
-    ctx.font = 'bold 10px monospace';
+    ctx.font = `bold ${coin.radius}px monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('$', coin.x, coin.y);
+    ctx.fillText('$', coin.x, coin.y + 1);
     ctx.restore();
   }
 
@@ -402,6 +449,22 @@ export function render(
     ctx.restore();
   }
 
+  // Active power-up indicators
+  if (state.activePowers.length > 0) {
+    ctx.save();
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'left';
+    let py = 80;
+    for (const pow of state.activePowers) {
+      const label = pow.type === 'shield' ? '🛡️ Shield' : pow.type === 'slowmo' ? '🐌 Slow-Mo' : '🧲 Magnet';
+      const secs = Math.ceil(pow.remaining / 1000);
+      ctx.fillStyle = 'rgba(0,255,204,0.8)';
+      ctx.fillText(`${label} ${secs}s`, 12, py);
+      py += 18;
+    }
+    ctx.restore();
+  }
+
   // Phase 2 indicator
   if (state.phase === 2 && state.distance < state.phaseThreshold + 100) {
     ctx.save();
@@ -413,7 +476,9 @@ export function render(
     ctx.restore();
   }
 
-  // Banner ad area
+  ctx.restore(); // end shake transform
+
+  // Banner ad area (outside shake)
   ctx.fillStyle = '#1a1a2e';
   ctx.fillRect(0, h, canvasW, BANNER_HEIGHT);
   if (!state.removeAds) {
@@ -447,15 +512,13 @@ export function handleInput(state: GameState): GameState {
     pt.vy = JUMP_FORCE;
     pt.isJumping = true;
   } else {
-    // Slam down
     pt.vy = Math.abs(JUMP_FORCE);
   }
 
-  // Mirror for bottom player
   if (state.playerBottom) {
     const pb = state.playerBottom;
     if (!pb.isJumping) {
-      pb.vy = -JUMP_FORCE; // jump down (away from line)
+      pb.vy = -JUMP_FORCE;
       pb.isJumping = true;
     } else {
       pb.vy = -Math.abs(JUMP_FORCE);
