@@ -60,74 +60,64 @@ function getJumpHeight() {
   return (Math.abs(JUMP_FORCE) * Math.abs(JUMP_FORCE)) / (2 * GRAVITY);
 }
 
-function getSpawnProfile(distance: number) {
-  if (distance < 100) {
-    return { gapPx: 560, easyGapPx: 660, sizeScale: 0.72, hardChance: 0 };
-  }
-  if (distance < 200) {
-    return { gapPx: 500, easyGapPx: 600, sizeScale: 0.82, hardChance: 0 };
-  }
-  if (distance < 350) {
-    return { gapPx: 450, easyGapPx: 540, sizeScale: 0.92, hardChance: 0.12 };
-  }
-  return { gapPx: 400, easyGapPx: 500, sizeScale: 1, hardChance: 0.2 };
+function getPhase(distance: number): 1 | 2 | 3 | 4 {
+  if (distance < 100) return 1;
+  if (distance < 300) return 2;
+  if (distance < 600) return 3;
+  return 4;
 }
 
-function getObstacleSizeCap(type: Obstacle['type']) {
-  const jumpLimitedCap = getJumpHeight() * 0.6;
-  const typeCap =
-    type === 'triangle'
-      ? 45
-      : type === 'circle'
-        ? 40
-        : type === 'star' || type === 'diamond'
-          ? 40
-          : 40;
+function getSpawnProfile(distance: number) {
+  const phase = getPhase(distance);
+  switch (phase) {
+    case 1: return { minGap: 500, maxGap: 700, maxSize: 35, speedMult: 1.0, hardChance: 0, maxBurst: 1 };
+    case 2: return { minGap: 350, maxGap: 500, maxSize: 40, speedMult: 1.2, hardChance: 0.1, maxBurst: 2 };
+    case 3: return { minGap: 250, maxGap: 380, maxSize: 50, speedMult: 1.4, hardChance: 0.2, maxBurst: 3 };
+    case 4: return { minGap: 180, maxGap: 280, maxSize: 50, speedMult: 1.65, hardChance: 0.3, maxBurst: 4 };
+  }
+}
 
+function getObstacleSizeCap(type: Obstacle['type'], distance: number) {
+  const jumpLimitedCap = getJumpHeight() * 0.6;
+  const profile = getSpawnProfile(distance);
+  const typeCap =
+    type === 'triangle' ? Math.min(45, profile.maxSize)
+    : type === 'circle' ? Math.min(40, profile.maxSize)
+    : Math.min(40, profile.maxSize);
   return Math.min(typeCap, jumpLimitedCap);
 }
 
 function chooseObstacleType(distance: number, mustBeEasy: boolean): Obstacle['type'] {
-  if (mustBeEasy) {
-    return randomFrom(['triangle', 'diamond', 'spike']);
+  const phase = getPhase(distance);
+
+  if (mustBeEasy || phase === 1) {
+    return randomFrom(['triangle', 'diamond']);
   }
 
-  const profile = getSpawnProfile(distance);
-
-  if (distance >= 200 && Math.random() < profile.hardChance) {
-    return randomFrom(['circle', 'star']);
+  if (phase === 2) {
+    return randomFrom(['triangle', 'diamond', 'circle', 'star']);
   }
 
-  if (distance < 100) {
-    return randomFrom(['triangle', 'diamond', 'circle']);
-  }
-
-  return randomFrom(['triangle', 'circle', 'diamond', 'spike']);
+  // Phase 3 & 4: all types
+  return randomFrom(['triangle', 'circle', 'diamond', 'spike', 'star']);
 }
 
 function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: boolean) {
-  const profile = getSpawnProfile(distance);
-  const cap = getObstacleSizeCap(type);
-  const isPotentialHardType = type === 'circle' || type === 'star';
+  const cap = getObstacleSizeCap(type, distance);
+  const phase = getPhase(distance);
 
-  let minSize = type === 'triangle' || type === 'spike' ? 28 : 24;
-  let maxSize = cap * profile.sizeScale;
+  let minSize = type === 'triangle' || type === 'spike' ? 24 : 22;
+  let maxSize = cap;
 
-  if (distance < 100) {
-    maxSize = Math.min(maxSize, type === 'triangle' || type === 'spike' ? 34 : 30);
+  if (phase === 1) {
+    maxSize = Math.min(maxSize, 35);
   }
 
   if (mustBeEasy) {
-    maxSize = Math.min(maxSize, type === 'triangle' || type === 'spike' ? 34 : 30);
-  }
-
-  if (!mustBeEasy && distance >= 200 && isPotentialHardType) {
-    minSize = Math.max(minSize, 34);
-    maxSize = cap;
+    maxSize = Math.min(maxSize, 32);
   }
 
   maxSize = Math.max(maxSize, minSize + 2);
-
   return randomBetween(minSize, maxSize);
 }
 
