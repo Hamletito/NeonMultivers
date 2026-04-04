@@ -5,13 +5,12 @@ export interface Player {
   vy: number;
   isJumping: boolean;
   isAboveLine: boolean;
-  // Animation state
-  squashX: number;   // width scale (1 = normal)
-  squashY: number;   // height scale (1 = normal)
-  rotation: number;  // radians
-  anticipation: number; // 0-1, jump anticipation squash timer
-  landTimer: number;    // ms remaining of land squash
-  wasJumping: boolean;  // track landing frame
+  squashX: number;
+  squashY: number;
+  rotation: number;
+  anticipation: number;
+  landTimer: number;
+  wasJumping: boolean;
 }
 
 export interface Obstacle {
@@ -20,18 +19,14 @@ export interface Obstacle {
   type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond' | 'spike_row' | 'bouncing_ball' | 'pendulum' | 'gap' | 'ceiling_spikes';
   size: number;
   isTop: boolean;
-  // bouncing_ball
   bouncePhase?: number;
   bounceSpeed?: number;
   baseY?: number;
-  // pendulum
   swingPhase?: number;
   swingSpeed?: number;
   anchorX?: number;
   pendulumLength?: number;
-  // spike_row
   spikeCount?: number;
-  // gap
   gapWidth?: number;
 }
 
@@ -51,6 +46,12 @@ export interface Particle {
   maxLife: number;
   color: string;
   size: number;
+  // Death animation particles
+  isDeathPiece?: boolean;
+  width?: number;
+  height?: number;
+  rotationSpeed?: number;
+  angle?: number;
 }
 
 export interface PowerUpActive {
@@ -66,6 +67,14 @@ export interface ShopItem {
   color?: string;
   owned: boolean;
   equipped?: boolean;
+}
+
+export interface DeathAnimation {
+  type: 'triangle_split' | 'circle_bounce' | 'ball_flatten' | 'spike_shatter' | 'gap_fall' | 'default';
+  timer: number;
+  x: number;
+  y: number;
+  color: string;
 }
 
 export interface GameState {
@@ -93,12 +102,21 @@ export interface GameState {
   equippedDeath: string;
   screenShake: number;
   coinFlash: number;
-  // Streak multiplier
   streak: number;
   streakMultiplier: number;
-  // Taunt messages
   tauntText: string;
   tauntTimer: number;
   shownTaunts: Set<number>;
   newRecordShown: boolean;
+  // Color shift & disruption
+  colorShiftIndex: number;
+  colorShiftTransition: number; // 0-1, how far into transition
+  disruptionType: number; // 0=none, 1=invisible obs, 2=invert, 3=no line
+  disruptionTimer: number;
+  lastColorShiftAt: number;
+  lastDisruptionAt: number;
+  // Death animation
+  deathAnim: DeathAnimation | null;
+  // Audio events for this frame
+  audioEvents: string[];
 }

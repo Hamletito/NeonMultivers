@@ -7,12 +7,15 @@ import ShopScreen from '../components/ShopScreen';
 import PauseOverlay from '../components/PauseOverlay';
 import { GameState, ShopItem } from '../game/types';
 import { createInitialState, resetForNewGame } from '../game/engine';
+import { toggleMute, isMuted, startMusic, stopMusic } from '../game/audio';
 
 const Index = () => {
   const [state, setState] = useState<GameState>(createInitialState);
+  const [muted, setMuted] = useState(isMuted());
 
   const handlePlay = useCallback(() => {
     setState(s => resetForNewGame(s));
+    startMusic(1);
   }, []);
 
   const handlePause = useCallback(() => {
@@ -25,6 +28,7 @@ const Index = () => {
 
   const handleMenu = useCallback(() => {
     setState(s => ({ ...s, screen: 'menu' }));
+    stopMusic();
   }, []);
 
   const handleShop = useCallback(() => {
@@ -34,10 +38,10 @@ const Index = () => {
   const handleRevive = useCallback(() => {
     setState(s => {
       const newState = { ...s, screen: 'playing' as const, freeReviveUsed: true, hasShield: true };
-      // Clear nearby obstacles
       newState.obstacles = newState.obstacles.filter(o => o.x > s.playerTop.x + 200);
       return newState;
     });
+    startMusic(1);
   }, []);
 
   const handleBuy = useCallback((item: ShopItem) => {
@@ -63,22 +67,28 @@ const Index = () => {
 
   const handleActivatePower = useCallback((type: 'shield' | 'slowmo' | 'magnet') => {
     setState(s => {
-      if (type === 'shield') {
-        return { ...s, hasShield: true };
-      }
+      if (type === 'shield') return { ...s, hasShield: true };
       const duration = type === 'slowmo' ? 3000 : 5000;
-      return {
-        ...s,
-        activePowers: [...s.activePowers, { type, remaining: duration }],
-      };
+      return { ...s, activePowers: [...s.activePowers, { type, remaining: duration }] };
     });
+  }, []);
+
+  const handleToggleMute = useCallback(() => {
+    toggleMute();
+    setMuted(isMuted());
   }, []);
 
   return (
     <div className="w-full h-screen overflow-hidden bg-background">
       <GameCanvas state={state} onStateChange={setState} />
       <MenuScreen state={state} onPlay={handlePlay} onShop={handleShop} />
-      <HUD state={state} onPause={handlePause} onActivatePower={handleActivatePower} />
+      <HUD
+        state={state}
+        onPause={handlePause}
+        onActivatePower={handleActivatePower}
+        isMuted={muted}
+        onToggleMute={handleToggleMute}
+      />
       <GameOverScreen state={state} onRevive={handleRevive} onMenu={handleMenu} />
       <PauseOverlay visible={state.screen === 'paused'} onResume={handleResume} onMenu={handleMenu} />
       {state.screen === 'shop' && (
@@ -92,7 +102,6 @@ const Index = () => {
           onBack={handleMenu}
         />
       )}
-      {/* Ad banner placeholder */}
       <div id="banner-ad" className="fixed bottom-0 left-0 right-0 h-[60px] z-10" />
     </div>
   );
