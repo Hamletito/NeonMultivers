@@ -664,7 +664,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
         }
       }
     }
-    if (state.screen === 'gameover') break;
+    if ((state as any).screen === 'gameover') break;
   }
 
   state.particles = state.particles
