@@ -17,9 +17,22 @@ export interface Player {
 export interface Obstacle {
   x: number;
   y: number;
-  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond';
+  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond' | 'spike_row' | 'bouncing_ball' | 'pendulum' | 'gap' | 'ceiling_spikes';
   size: number;
   isTop: boolean;
+  // bouncing_ball
+  bouncePhase?: number;
+  bounceSpeed?: number;
+  baseY?: number;
+  // pendulum
+  swingPhase?: number;
+  swingSpeed?: number;
+  anchorX?: number;
+  pendulumLength?: number;
+  // spike_row
+  spikeCount?: number;
+  // gap
+  gapWidth?: number;
 }
 
 export interface Coin {
