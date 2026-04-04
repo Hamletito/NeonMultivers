@@ -93,4 +93,12 @@ export interface GameState {
   equippedDeath: string;
   screenShake: number;
   coinFlash: number;
+  // Streak multiplier
+  streak: number;
+  streakMultiplier: number;
+  // Taunt messages
+  tauntText: string;
+  tauntTimer: number;
+  shownTaunts: Set<number>;
+  newRecordShown: boolean;
 }
