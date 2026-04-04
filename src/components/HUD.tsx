@@ -22,6 +22,11 @@ export default function HUD({ state, onPause, onActivatePower }: Props) {
           <p className="text-primary font-mono text-2xl font-bold drop-shadow-[0_0_10px_rgba(0,255,204,0.4)]">
             {state.score}
           </p>
+          {state.streak > 0 && (
+            <p className="text-primary/50 font-mono text-xs">
+              🔥 {state.streak}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1 text-neon-yellow font-mono text-sm">
           <span>💰</span>
