@@ -1,4 +1,4 @@
-import { GameState, Obstacle, Coin, Particle, Player, DeathAnimation } from './types';
+import { GameState, Obstacle, Coin, Particle, Player, DeathAnimation, GhostFrame } from './types';
 import {
   BG_COLOR,
   LINE_COLOR,
@@ -13,7 +13,7 @@ import {
   BANNER_HEIGHT,
   SKIN_COLORS,
 } from './constants';
-import { playJump, playLand, playCoin, playDeath, playStreakChime, playWhoosh, updateMusicTempo, stopMusic } from './audio';
+import { playJump, playLand, playCoin, playDeath, playStreakChime, playWhoosh, updateMusicTempo, stopMusic, playDarknessWarning, playMultiverseActivate, playAdrenalineActivate } from './audio';
 
 const MAX_VISIBLE_OBSTACLES = 3;
 const OBSTACLE_SPAWN_X_OFFSET = 64;
@@ -21,14 +21,13 @@ const COIN_SAFE_CLEARANCE_X = 110;
 const COIN_MIN_WINDOW_WIDTH = 140;
 const SAFE_SPAWN_ZONE = 300;
 
-// Color themes for 200m shifts
 const COLOR_THEMES = [
-  { line: '#00ffcc', obstacle: '#ff3366', bg: '#0f0f1a', glow: 'rgba(0,255,204,' }, // Neon Cyan
-  { line: '#a855f7', obstacle: '#f472b6', bg: '#1a0f2e', glow: 'rgba(168,85,247,' }, // Purple
-  { line: '#fb923c', obstacle: '#ef4444', bg: '#1a150f', glow: 'rgba(251,146,60,' }, // Orange
-  { line: '#ef4444', obstacle: '#fbbf24', bg: '#1a0f0f', glow: 'rgba(239,68,68,' }, // Red
-  { line: '#38bdf8', obstacle: '#818cf8', bg: '#0f1a2e', glow: 'rgba(56,189,248,' }, // Ice Blue
-  { line: '#fbbf24', obstacle: '#f97316', bg: '#1a1a0f', glow: 'rgba(251,191,36,' }, // Gold
+  { line: '#00ffcc', obstacle: '#ff3366', bg: '#0f0f1a', glow: 'rgba(0,255,204,' },
+  { line: '#a855f7', obstacle: '#f472b6', bg: '#1a0f2e', glow: 'rgba(168,85,247,' },
+  { line: '#fb923c', obstacle: '#ef4444', bg: '#1a150f', glow: 'rgba(251,146,60,' },
+  { line: '#ef4444', obstacle: '#fbbf24', bg: '#1a0f0f', glow: 'rgba(239,68,68,' },
+  { line: '#38bdf8', obstacle: '#818cf8', bg: '#0f1a2e', glow: 'rgba(56,189,248,' },
+  { line: '#fbbf24', obstacle: '#f97316', bg: '#1a1a0f', glow: 'rgba(251,191,36,' },
 ];
 
 let frameCount = 0;
@@ -66,8 +65,35 @@ function getPhase(distance: number): 1 | 2 | 3 | 4 {
   return 4;
 }
 
-function getSpawnProfile(distance: number) {
+function getRunCount(): number {
+  return parseInt(localStorage.getItem('neonRunCount') || '0');
+}
+
+function incrementRunCount() {
+  const c = getRunCount() + 1;
+  localStorage.setItem('neonRunCount', String(c));
+  return c;
+}
+
+function getSpawnProfile(distance: number, runCount: number) {
   const phase = getPhase(distance);
+  // Tutorial overrides for first 3 runs
+  if (runCount <= 1) {
+    return { minGap: 600, maxGap: 700, maxSize: 30, speedMult: 0.85, hardChance: 0, maxBurst: 1 };
+  }
+  if (runCount === 2) {
+    const p = phase <= 2
+      ? { minGap: 500, maxGap: 600, maxSize: 35, speedMult: 0.95, hardChance: 0, maxBurst: 1 }
+      : { minGap: 400, maxGap: 500, maxSize: 40, speedMult: 1.0, hardChance: 0.05, maxBurst: 2 };
+    return p;
+  }
+  if (runCount === 3) {
+    const p = phase <= 2
+      ? { minGap: 400, maxGap: 550, maxSize: 38, speedMult: 1.0, hardChance: 0.05, maxBurst: 2 }
+      : { minGap: 300, maxGap: 450, maxSize: 45, speedMult: 1.2, hardChance: 0.15, maxBurst: 3 };
+    return p;
+  }
+  // Normal game
   switch (phase) {
     case 1: return { minGap: 500, maxGap: 700, maxSize: 35, speedMult: 1.0, hardChance: 0, maxBurst: 1 };
     case 2: return { minGap: 350, maxGap: 500, maxSize: 40, speedMult: 1.2, hardChance: 0.1, maxBurst: 2 };
@@ -76,15 +102,31 @@ function getSpawnProfile(distance: number) {
   }
 }
 
-function getObstacleSizeCap(type: Obstacle['type'], distance: number) {
+function getObstacleSizeCap(type: Obstacle['type'], distance: number, runCount: number) {
   const jumpLimitedCap = getJumpHeight() * 0.6;
-  const profile = getSpawnProfile(distance);
+  const profile = getSpawnProfile(distance, runCount);
   const typeCap = type === 'triangle' ? Math.min(45, profile.maxSize) : type === 'circle' ? Math.min(40, profile.maxSize) : Math.min(40, profile.maxSize);
   return Math.min(typeCap, jumpLimitedCap);
 }
 
-function chooseObstacleType(distance: number, mustBeEasy: boolean): Obstacle['type'] {
+function chooseObstacleType(distance: number, mustBeEasy: boolean, runCount: number): Obstacle['type'] {
   const phase = getPhase(distance);
+  // Run 1: only triangles and diamonds
+  if (runCount <= 1) return randomFrom(['triangle', 'diamond']);
+  // Run 2: add spike_row and bouncing_ball
+  if (runCount === 2) {
+    if (mustBeEasy || phase === 1) return randomFrom(['triangle', 'diamond']);
+    return randomFrom(['triangle', 'diamond', 'spike_row', 'bouncing_ball']);
+  }
+  // Run 3: all except pendulum
+  if (runCount === 3) {
+    if (mustBeEasy || phase === 1) return randomFrom(['triangle', 'diamond']);
+    const types: Obstacle['type'][] = ['triangle', 'circle', 'diamond', 'spike', 'star', 'spike_row', 'bouncing_ball', 'expanding', 'intermittent'];
+    if (distance >= 300) types.push('gap');
+    if (distance >= 500) types.push('ceiling_spikes');
+    return randomFrom(types);
+  }
+  // Run 4+: full game
   if (mustBeEasy || phase === 1) return randomFrom(['triangle', 'diamond']);
   if (phase === 2) {
     const types: Obstacle['type'][] = ['triangle', 'diamond', 'circle', 'star', 'expanding', 'intermittent'];
@@ -98,14 +140,15 @@ function chooseObstacleType(distance: number, mustBeEasy: boolean): Obstacle['ty
   return randomFrom(types);
 }
 
-function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: boolean) {
+function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: boolean, runCount: number) {
   if (type === 'spike_row' || type === 'bouncing_ball' || type === 'pendulum' || type === 'gap' || type === 'ceiling_spikes' || type === 'expanding' || type === 'intermittent') return 30;
-  const cap = getObstacleSizeCap(type, distance);
+  const cap = getObstacleSizeCap(type, distance, runCount);
   const phase = getPhase(distance);
   let minSize = type === 'triangle' || type === 'spike' ? 24 : 22;
   let maxSize = cap;
   if (phase === 1) maxSize = Math.min(maxSize, 35);
   if (mustBeEasy) maxSize = Math.min(maxSize, 32);
+  if (runCount <= 1) maxSize = Math.min(maxSize, 30);
   maxSize = Math.max(maxSize, minSize + 2);
   return randomBetween(minSize, maxSize);
 }
@@ -114,9 +157,9 @@ function isHardObstacle(obstacle: Obstacle) {
   return (obstacle.type === 'circle' || obstacle.type === 'star' || obstacle.type === 'spike_row' || obstacle.type === 'bouncing_ball') && obstacle.size >= 30;
 }
 
-function createObstacle(canvasW: number, lineY: number, isTop: boolean, distance: number, mustBeEasy: boolean, canvasH: number): Obstacle {
-  const type = chooseObstacleType(distance, mustBeEasy);
-  const size = getObstacleSize(type, distance, mustBeEasy);
+function createObstacle(canvasW: number, lineY: number, isTop: boolean, distance: number, mustBeEasy: boolean, canvasH: number, runCount: number): Obstacle {
+  const type = chooseObstacleType(distance, mustBeEasy, runCount);
+  const size = getObstacleSize(type, distance, mustBeEasy, runCount);
   const spawnX = canvasW + OBSTACLE_SPAWN_X_OFFSET;
   if (type === 'spike_row') { const count = 3 + Math.floor(Math.random() * 3); return { x: spawnX, y: lineY - 12, type, size: 24, isTop: true, spikeCount: count }; }
   if (type === 'bouncing_ball') return { x: spawnX, y: lineY - 20, type, size: 18, isTop: true, bouncePhase: Math.random() * Math.PI * 2, bounceSpeed: 0.004, baseY: lineY };
@@ -152,11 +195,27 @@ function spawnSafeCoin(state: GameState, canvasW: number, lineY: number): Coin |
   return { x, y, collected: false, radius: COIN_RADIUS };
 }
 
-function defaultDeathState() {
-  return { colorShiftIndex: 0, colorShiftTransition: 0, disruptionType: 0, disruptionTimer: 0, lastColorShiftAt: 0, lastDisruptionAt: 0, deathAnim: null as DeathAnimation | null, audioEvents: [] as string[] };
+function defaultExtraState() {
+  return {
+    colorShiftIndex: 0, colorShiftTransition: 0, disruptionType: 0, disruptionTimer: 0,
+    lastColorShiftAt: 0, lastDisruptionAt: 0, deathAnim: null as DeathAnimation | null, audioEvents: [] as string[],
+  };
+}
+
+function loadBestGhost(): GhostFrame[] {
+  try {
+    const raw = localStorage.getItem('bestGhostJumps');
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch { return []; }
+}
+
+function saveBestGhost(frames: GhostFrame[]) {
+  try { localStorage.setItem('bestGhostJumps', JSON.stringify(frames)); } catch {}
 }
 
 export function createInitialState(): GameState {
+  const runCount = getRunCount();
   return {
     screen: 'menu', score: 0, bestScore: parseInt(localStorage.getItem('bestScore') || '0'),
     coins: parseInt(localStorage.getItem('coins') || '0'), totalCoins: parseInt(localStorage.getItem('coins') || '0'),
@@ -169,18 +228,61 @@ export function createInitialState(): GameState {
     equippedDeath: localStorage.getItem('equippedDeath') || '',
     screenShake: 0, coinFlash: 0, streak: 0, streakMultiplier: 1,
     tauntText: '', tauntTimer: 0, shownTaunts: new Set(), newRecordShown: false,
-    ...defaultDeathState(),
+    ...defaultExtraState(),
+    runCount,
+    ghostFrames: [],
+    bestGhostFrames: loadBestGhost(),
+    ghostIndex: 0,
+    adrenaline: 0,
+    adrenalineActive: false,
+    adrenalineTimer: 0,
+    lastDodgeTime: 0,
+    cinematicSlowMo: 0,
+    cinematicTriggered: false,
+    darknessActive: false,
+    darknessTimer: 0,
+    darknessDuration: 0,
+    nextDarknessAt: 400 + Math.random() * 200,
+    darknessWarning: 0,
+    darknessFade: 0,
+    multiverseActive: false,
+    multiverseTimer: 0,
+    multiverseDuration: 0,
+    nextMultiverseAt: 300 + Math.random() * 200,
+    multiverseOffsets: [0, 80, -60, 40],
   };
 }
 
 export function resetForNewGame(state: GameState): GameState {
   prevStreakMult = 1;
+  const newRunCount = incrementRunCount();
   return {
     ...state, screen: 'playing', score: 0, distance: 0, speed: BASE_SPEED, baseSpeed: BASE_SPEED, phase: 1,
     playerTop: makePlayer(80, 0, true), playerBottom: null, obstacles: [], coinItems: [], particles: [],
     activePowers: [], hasShield: false, freeReviveUsed: false, screenShake: 0, coinFlash: 0,
     streak: 0, streakMultiplier: 1, tauntText: '', tauntTimer: 0, shownTaunts: new Set(), newRecordShown: false,
-    ...defaultDeathState(),
+    ...defaultExtraState(),
+    runCount: newRunCount,
+    ghostFrames: [],
+    bestGhostFrames: loadBestGhost(),
+    ghostIndex: 0,
+    adrenaline: 0,
+    adrenalineActive: false,
+    adrenalineTimer: 0,
+    lastDodgeTime: 0,
+    cinematicSlowMo: 0,
+    cinematicTriggered: false,
+    darknessActive: false,
+    darknessTimer: 0,
+    darknessDuration: 0,
+    nextDarknessAt: 400 + Math.random() * 200,
+    darknessWarning: 0,
+    darknessFade: 0,
+    multiverseActive: false,
+    multiverseTimer: 0,
+    multiverseDuration: 0,
+    nextMultiverseAt: 300 + Math.random() * 200,
+    multiverseOffsets: [0, 60 + Math.random() * 60, -(60 + Math.random() * 60), 30 + Math.random() * 50],
   };
 }
 
@@ -228,12 +330,9 @@ function getDeathType(obsType: Obstacle['type']): DeathAnimation['type'] {
 }
 
 function addDeathParticles(particles: Particle[], deathType: DeathAnimation['type'], x: number, y: number, color: string, size: number) {
-  // Always add base burst
   addParticles(particles, x, y, color, 20);
-
   switch (deathType) {
     case 'triangle_split':
-      // Two triangle halves flying apart
       particles.push({ x: x - 5, y, vx: -4, vy: -3, life: 1.5, maxLife: 1.5, color, size: size * 0.6, isDeathPiece: true, width: size, height: size / 2, rotationSpeed: -3, angle: 0 });
       particles.push({ x: x + 5, y, vx: 4, vy: -2, life: 1.5, maxLife: 1.5, color, size: size * 0.6, isDeathPiece: true, width: size, height: size / 2, rotationSpeed: 3, angle: 0 });
       break;
@@ -251,8 +350,7 @@ function addDeathParticles(particles: Particle[], deathType: DeathAnimation['typ
     case 'gap_fall':
       particles.push({ x, y, vx: 0, vy: 8, life: 2, maxLife: 2, color, size: size, isDeathPiece: true, width: size, height: size, rotationSpeed: 2, angle: 0 });
       break;
-    default:
-      break;
+    default: break;
   }
 }
 
@@ -272,11 +370,25 @@ function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: num
   state.streak = 0; state.streakMultiplier = 1;
   const distCoins = Math.floor(state.distance / 10);
   state.coins += distCoins; state.totalCoins += distCoins;
-  if (state.score > state.bestScore) { state.bestScore = state.score; localStorage.setItem('bestScore', String(state.bestScore)); }
+  if (state.score > state.bestScore) {
+    state.bestScore = state.score;
+    localStorage.setItem('bestScore', String(state.bestScore));
+    // Save ghost of this best run
+    saveBestGhost(state.ghostFrames);
+  }
   localStorage.setItem('coins', String(state.totalCoins));
   passedObstacleIds.clear();
   playDeath();
   stopMusic();
+}
+
+export function activateAdrenaline(state: GameState): GameState {
+  if (state.adrenaline < 100 || state.adrenalineActive) return state;
+  state.adrenalineActive = true;
+  state.adrenalineTimer = 3000;
+  state.adrenaline = 0;
+  playAdrenalineActivate();
+  return state;
 }
 
 export function update(state: GameState, canvasW: number, canvasH: number, dt: number): GameState {
@@ -285,17 +397,97 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   const lineY = (canvasH - BANNER_HEIGHT) / 2;
   frameCount++;
   state.audioEvents = [];
+  const runCount = state.runCount;
 
-  const spawnProfile = getSpawnProfile(state.distance);
+  const spawnProfile = getSpawnProfile(state.distance, runCount);
   state.speed = Math.min(MAX_SPEED, state.baseSpeed * spawnProfile.speedMult + state.distance * SPEED_INCREMENT * 0.3);
   updateMusicTempo(spawnProfile.speedMult);
 
   let effectiveSpeed = state.speed;
   const slowmo = state.activePowers.find(p => p.type === 'slowmo');
   if (slowmo) effectiveSpeed *= 0.5;
+  // Adrenaline slow-mo
+  if (state.adrenalineActive) effectiveSpeed *= 0.5;
+  // Cinematic slow-mo
+  if (state.cinematicSlowMo > 0) effectiveSpeed *= 0.5;
+
   state.activePowers = state.activePowers.map(p => ({ ...p, remaining: p.remaining - dt })).filter(p => p.remaining > 0);
   state.distance += effectiveSpeed * 0.1;
   state.score = Math.floor(state.distance);
+
+  // Adrenaline timer
+  if (state.adrenalineActive) {
+    state.adrenalineTimer = Math.max(0, state.adrenalineTimer - dt);
+    if (state.adrenalineTimer <= 0) state.adrenalineActive = false;
+  }
+
+  // Adrenaline drain if no dodges for 3 seconds
+  if (!state.adrenalineActive && state.adrenaline > 0) {
+    const timeSinceDodge = Date.now() - state.lastDodgeTime;
+    if (timeSinceDodge > 3000) {
+      state.adrenaline = Math.max(0, state.adrenaline - dt * 0.01);
+    }
+  }
+
+  // Cinematic slow-mo for new record
+  if (state.cinematicSlowMo > 0) {
+    state.cinematicSlowMo = Math.max(0, state.cinematicSlowMo - dt);
+  }
+
+  // Cinematic trigger on new best
+  if (state.score > state.bestScore && !state.cinematicTriggered) {
+    state.cinematicTriggered = true;
+    state.cinematicSlowMo = 2000;
+    state.tauntText = 'NEW RECORD'; state.tauntTimer = 2.0;
+    state.newRecordShown = true;
+    playWhoosh();
+  }
+
+  // Darkness mode
+  if (state.distance >= state.nextDarknessAt && !state.darknessActive && state.darknessWarning <= 0) {
+    state.darknessWarning = 1000; // 1 second warning
+    playDarknessWarning();
+  }
+  if (state.darknessWarning > 0) {
+    state.darknessWarning -= dt;
+    if (state.darknessWarning <= 0) {
+      state.darknessActive = true;
+      state.darknessDuration = 8000 + Math.random() * 7000;
+      state.darknessTimer = state.darknessDuration;
+      state.darknessFade = 0;
+    }
+  }
+  if (state.darknessActive) {
+    state.darknessFade = Math.min(1, state.darknessFade + dt / 500);
+    state.darknessTimer -= dt;
+    if (state.darknessTimer <= 0) {
+      state.darknessActive = false;
+      state.nextDarknessAt = state.distance + 200 + Math.random() * 300;
+    }
+  } else if (state.darknessFade > 0) {
+    state.darknessFade = Math.max(0, state.darknessFade - dt / 500);
+  }
+
+  // Multiverse mode (simplified visual)
+  if (state.distance >= state.nextMultiverseAt && !state.multiverseActive) {
+    state.multiverseActive = true;
+    state.multiverseDuration = 10000 + Math.random() * 10000;
+    state.multiverseTimer = state.multiverseDuration;
+    state.multiverseOffsets = [0, 60 + Math.random() * 60, -(60 + Math.random() * 60), 30 + Math.random() * 50];
+    playMultiverseActivate();
+  }
+  if (state.multiverseActive) {
+    state.multiverseTimer -= dt;
+    if (state.multiverseTimer <= 0) {
+      state.multiverseActive = false;
+      state.nextMultiverseAt = state.distance + 300 + Math.random() * 300;
+    }
+  }
+
+  // Record ghost frame
+  if (frameCount % 3 === 0) {
+    state.ghostFrames.push({ distance: state.distance, y: state.playerTop.y, isJumping: state.playerTop.isJumping });
+  }
 
   // Color shift every 200m
   const colorIdx = Math.floor(state.distance / 200) % COLOR_THEMES.length;
@@ -320,16 +512,15 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if (state.disruptionTimer <= 0) state.disruptionType = 0;
   }
 
-  // Taunts
-  for (const [dist, msg] of Object.entries(TAUNT_MESSAGES)) {
-    const d = parseInt(dist);
-    if (state.distance >= d && !state.shownTaunts.has(d)) {
-      state.shownTaunts.add(d); state.tauntText = msg; state.tauntTimer = 1.5;
-      playWhoosh();
+  // Taunts (skip if cinematic is active — it has its own text)
+  if (state.cinematicSlowMo <= 0) {
+    for (const [dist, msg] of Object.entries(TAUNT_MESSAGES)) {
+      const d = parseInt(dist);
+      if (state.distance >= d && !state.shownTaunts.has(d)) {
+        state.shownTaunts.add(d); state.tauntText = msg; state.tauntTimer = 1.5;
+        playWhoosh();
+      }
     }
-  }
-  if (state.score > state.bestScore && !state.newRecordShown) {
-    state.newRecordShown = true; state.tauntText = 'NEW RECORD 🔥'; state.tauntTimer = 1.5; playWhoosh();
   }
   if (state.tauntTimer > 0) state.tauntTimer = Math.max(0, state.tauntTimer - dt / 1000);
 
@@ -378,13 +569,14 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
+  // Spawning — completely independent from visual effects
   const visibleCount = state.obstacles.filter(o => o.x + o.size / 2 >= 0 && o.x - o.size / 2 <= canvasW).length;
   if (visibleCount < MAX_VISIBLE_OBSTACLES) {
     const mustBeEasy = forceEasyFollowUp || patternGapPending;
     const spawnOnTop = state.phase === 1 ? true : nextPhase2ObstacleOnTop;
     let candidate: Obstacle;
     if (isFirstObstacle) candidate = { x: canvasW + OBSTACLE_SPAWN_X_OFFSET, y: (canvasH - BANNER_HEIGHT) / 2 - 15, type: 'triangle', size: 28, isTop: true };
-    else candidate = createObstacle(canvasW, (canvasH - BANNER_HEIGHT) / 2, spawnOnTop, state.distance, mustBeEasy, canvasH);
+    else candidate = createObstacle(canvasW, (canvasH - BANNER_HEIGHT) / 2, spawnOnTop, state.distance, mustBeEasy, canvasH, runCount);
 
     const MIN_ABSOLUTE_GAP = 350 - Math.min(150, state.distance * 0.15);
     let requiredGapPx = patternGapPending ? spawnProfile.maxGap * 1.3 : randomBetween(spawnProfile.minGap, spawnProfile.maxGap);
@@ -417,20 +609,27 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     return { ...c, x: nx, y: ny };
   }).filter(c => c.x > -50 && !c.collected);
 
-  // Streak tracking
+  // Streak tracking + adrenaline fill
   for (const obs of state.obstacles) {
     const oid = (obs as any)._id as number;
     if (oid !== undefined && obs.x + obs.size / 2 < pt.x && !passedObstacleIds.has(oid)) {
       passedObstacleIds.add(oid);
       state.streak++;
+      state.lastDodgeTime = Date.now();
+      // Adrenaline fill (not during adrenaline active)
+      if (!state.adrenalineActive) {
+        state.adrenaline = Math.min(100, state.adrenaline + 15);
+      }
       if (state.streak >= 30) state.streakMultiplier = 4;
       else if (state.streak >= 20) state.streakMultiplier = 3;
       else if (state.streak >= 10) state.streakMultiplier = 2;
       else state.streakMultiplier = 1;
-      // Streak milestone sound
       if (state.streakMultiplier > prevStreakMult) { playStreakChime(state.streakMultiplier); prevStreakMult = state.streakMultiplier; }
     }
   }
+
+  // Multiverse x2 score multiplier
+  const mvMult = state.multiverseActive ? 2 : 1;
 
   for (const coin of state.coinItems) {
     if (coin.collected) continue;
@@ -438,7 +637,8 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
       const dx = p.x - coin.x, dy = p.y - coin.y;
       if (Math.sqrt(dx * dx + dy * dy) < p.size / 2 + coin.radius) {
         coin.collected = true;
-        state.coins += state.streakMultiplier; state.totalCoins += state.streakMultiplier;
+        const gain = state.streakMultiplier * mvMult;
+        state.coins += gain; state.totalCoins += gain;
         state.coinFlash = 1; addParticles(state.particles, coin.x, coin.y, '#facc15', 12);
         playCoin();
       }
@@ -514,7 +714,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.translate(shakeX, shakeY);
 
-  // Disruption type 2: invert colors briefly
   const invertActive = state.disruptionType === 2 && state.disruptionTimer > 0;
   const invisibleObs = state.disruptionType === 1 && state.disruptionTimer > 0;
   const noLine = state.disruptionType === 3 && state.disruptionTimer > 0;
@@ -522,7 +721,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   ctx.fillStyle = invertActive ? '#e0e0e0' : theme.bg;
   ctx.fillRect(-10, -10, canvasW + 20, canvasH + 20);
 
-  // Flash at start of disruption type 2
   if (invertActive && state.disruptionTimer > 2.7) {
     ctx.save(); ctx.globalAlpha = (state.disruptionTimer - 2.7) / 0.3; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvasW, h); ctx.restore();
   }
@@ -532,7 +730,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1;
   for (let x = (frameCount * 2) % 60; x < canvasW; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
 
-  // Ground line (skip if noLine disruption or gap)
   if (!noLine) {
     const gaps = state.obstacles.filter(o => o.type === 'gap');
     const lineColor = invertActive ? '#333' : theme.line;
@@ -556,11 +753,48 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.restore(); ctx.restore(); return;
   }
 
+  // Ghost replay
+  if (state.bestGhostFrames.length > 0 && state.screen === 'playing') {
+    // Find ghost frame closest to current distance
+    let gi = state.ghostIndex;
+    while (gi < state.bestGhostFrames.length - 1 && state.bestGhostFrames[gi].distance < state.distance) gi++;
+    state.ghostIndex = gi;
+    const gf = state.bestGhostFrames[gi];
+    if (gf) {
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 8;
+      ctx.fillRect(80 - PLAYER_SIZE / 2, gf.y - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+      // Label
+      ctx.globalAlpha = 0.5;
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText('👻 BEST', 80, gf.y - PLAYER_SIZE / 2 - 6);
+      ctx.restore();
+    }
+  }
+
   const drawPlayer = (p: Player) => {
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation); ctx.scale(p.squashX, p.squashY);
-    if (state.streak >= 30) { ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 25; } else { ctx.shadowColor = skinColor; ctx.shadowBlur = 15; }
-    ctx.fillStyle = state.streak >= 30 ? '#ffd700' : skinColor;
+    if (state.adrenalineActive) {
+      ctx.shadowColor = skinColor; ctx.shadowBlur = 40;
+    } else if (state.streak >= 30) {
+      ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 25;
+    } else {
+      ctx.shadowColor = skinColor; ctx.shadowBlur = 15;
+    }
+    ctx.fillStyle = state.adrenalineActive ? skinColor : (state.streak >= 30 ? '#ffd700' : skinColor);
     ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+    if (state.adrenalineActive) {
+      // Intense glow overlay
+      ctx.globalAlpha = 0.3 + 0.2 * Math.sin(Date.now() * 0.01);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+      ctx.globalAlpha = 1;
+    }
     if (state.hasShield) { ctx.strokeStyle = 'rgba(0,255,204,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, p.size * 0.8, 0, Math.PI * 2); ctx.stroke(); }
     ctx.restore();
   };
@@ -572,7 +806,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   for (const obs of state.obstacles) {
     if (obs.type === 'intermittent' && !obs.intermittentVisible) { ctx.save(); ctx.globalAlpha = 0.15; ctx.strokeStyle = obsColor; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(obs.x, obs.y, obs.size / 2, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); continue; }
     ctx.save();
-    // Ground shadow — always visible even during invisible disruption
     if (obs.type !== 'gap' && obs.type !== 'ceiling_spikes' && obs.type !== 'pendulum') {
       ctx.save(); ctx.globalAlpha = invisibleObs ? 0.35 : 0.25; ctx.fillStyle = invisibleObs ? 'rgba(0,0,0,0.6)' : obsColor;
       ctx.beginPath(); ctx.ellipse(obs.x, lineY, obs.size / 2 + 4, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
@@ -598,6 +831,47 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.restore();
   }
 
+  // Multiverse visual overlay
+  if (state.multiverseActive && state.screen === 'playing') {
+    const fadeIn = Math.min(1, (state.multiverseDuration - state.multiverseTimer) / 500);
+    const fadeOut = Math.min(1, state.multiverseTimer / 500);
+    const alpha = Math.min(fadeIn, fadeOut) * 0.3;
+    // Draw split lines
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(canvasW / 2, 0); ctx.lineTo(canvasW / 2, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(canvasW, h / 2); ctx.stroke();
+    // Draw ghost players in other quadrants
+    const quadrants = [
+      { x: canvasW / 4, y: h / 4 },
+      { x: canvasW * 3 / 4, y: h / 4 },
+      { x: canvasW / 4, y: h * 3 / 4 },
+    ];
+    for (let i = 0; i < 3; i++) {
+      const q = quadrants[i];
+      const offset = state.multiverseOffsets[i + 1] || 0;
+      ctx.globalAlpha = alpha * 0.7;
+      ctx.fillStyle = skinColor;
+      ctx.shadowColor = skinColor;
+      ctx.shadowBlur = 10;
+      const gy = state.playerTop.y + (q.y - h / 2) * 0.3;
+      ctx.fillRect(q.x - PLAYER_SIZE / 2 + offset * 0.2, gy - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+    }
+    // Multiverse label
+    ctx.globalAlpha = alpha * 2;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚡ MULTIVERSE ⚡', canvasW / 2, 18);
+    // x2 indicator
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('SCORE x2', canvasW / 2, 34);
+    ctx.restore();
+  }
+
   // Coins
   for (const coin of state.coinItems) {
     if (coin.collected) continue;
@@ -610,7 +884,7 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.fillText('$', coin.x, coin.y + 1); ctx.restore();
   }
 
-  // Particles (including death pieces)
+  // Particles
   for (const p of state.particles) {
     ctx.save(); ctx.globalAlpha = p.life / p.maxLife;
     if (p.isDeathPiece && p.width && p.height) {
@@ -644,15 +918,31 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.fillText(`${milestoneFlashScore}m`, canvasW / 2, h / 2 - 80); ctx.restore();
   }
 
+  // Taunt / cinematic new record
   if (state.tauntTimer > 0 && state.tauntText && state.screen === 'playing') {
     ctx.save();
-    const elapsed = 1.5 - state.tauntTimer;
-    let alpha = elapsed < 0.3 ? elapsed / 0.3 : state.tauntTimer < 0.3 ? state.tauntTimer / 0.3 : 1;
-    ctx.globalAlpha = alpha * 0.85;
-    const isRecord = state.tauntText.includes('RECORD');
-    ctx.fillStyle = isRecord ? '#ffd700' : theme.line; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 25;
-    ctx.font = `bold ${isRecord ? 28 : 22}px monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(state.tauntText, canvasW / 2, h / 2 - 40); ctx.restore();
+    const elapsed = (state.tauntText === 'NEW RECORD' ? 2.0 : 1.5) - state.tauntTimer;
+    const fadeTime = 0.3;
+    let alpha = elapsed < fadeTime ? elapsed / fadeTime : state.tauntTimer < fadeTime ? state.tauntTimer / fadeTime : 1;
+    const isCinematic = state.tauntText === 'NEW RECORD';
+    ctx.globalAlpha = alpha * (isCinematic ? 1 : 0.85);
+    ctx.fillStyle = isCinematic ? '#ffd700' : (state.tauntText.includes('RECORD') ? '#ffd700' : theme.line);
+    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = isCinematic ? 40 : 25;
+    ctx.font = `bold ${isCinematic ? 36 : 22}px monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(state.tauntText, canvasW / 2, h / 2 - 40);
+    ctx.restore();
+  }
+
+  // Cinematic golden vignette
+  if (state.cinematicSlowMo > 0 && state.screen === 'playing') {
+    const vigAlpha = Math.min(0.4, (2000 - state.cinematicSlowMo) / 1000) * Math.min(1, state.cinematicSlowMo / 500);
+    ctx.save();
+    const gradient = ctx.createRadialGradient(canvasW / 2, h / 2, h * 0.3, canvasW / 2, h / 2, h * 0.8);
+    gradient.addColorStop(0, 'rgba(255,215,0,0)');
+    gradient.addColorStop(1, `rgba(255,215,0,${vigAlpha})`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvasW, h);
+    ctx.restore();
   }
 
   if (state.streak >= 10 && state.screen === 'playing') {
@@ -663,10 +953,37 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.fillText(badge, canvasW / 2 + 50, 30); ctx.restore();
   }
 
-  // Disruption indicator
   if (state.disruptionTimer > 0) {
     ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = '#ff0000'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
     ctx.fillText('⚠ DISRUPTION ⚠', canvasW / 2, 20); ctx.restore();
+  }
+
+  // Darkness mode overlay
+  if (state.darknessFade > 0 && state.screen === 'playing') {
+    ctx.save();
+    // Create darkness mask — black everywhere except around player
+    const playerX = state.playerTop.x;
+    const playerY = state.playerTop.y;
+    const radius = 80;
+    ctx.globalAlpha = state.darknessFade * 0.95;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvasW, h);
+    // Cut out circle around player
+    ctx.globalCompositeOperation = 'destination-out';
+    const grad = ctx.createRadialGradient(playerX, playerY, 0, playerX, playerY, radius);
+    grad.addColorStop(0, 'rgba(0,0,0,1)');
+    grad.addColorStop(0.7, 'rgba(0,0,0,0.8)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(playerX - radius, playerY - radius, radius * 2, radius * 2);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+  }
+
+  // Darkness warning flicker
+  if (state.darknessWarning > 0 && state.screen === 'playing') {
+    const flicker = Math.sin(Date.now() * 0.02) > 0 ? 0.1 : 0;
+    ctx.save(); ctx.globalAlpha = flicker; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, canvasW, h); ctx.restore();
   }
 
   ctx.restore();
@@ -688,5 +1005,7 @@ export function handleInput(state: GameState): GameState {
   const pt = state.playerTop;
   if (!pt.isJumping) { pt.anticipation = 1; pt.vy = JUMP_FORCE; pt.isJumping = true; } else { pt.vy = Math.abs(JUMP_FORCE); }
   if (state.playerBottom) { const pb = state.playerBottom; if (!pb.isJumping) { pb.anticipation = 1; pb.vy = -JUMP_FORCE; pb.isJumping = true; } else { pb.vy = -Math.abs(JUMP_FORCE); } }
+  // Record jump for ghost
+  state.ghostFrames.push({ distance: state.distance, y: pt.y, isJumping: true });
   return state;
 }
