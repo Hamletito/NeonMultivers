@@ -104,7 +104,6 @@ export function playStreakChime(multiplier: number) {
 export function playWhoosh() {
   if (muted) return;
   const c = getCtx();
-  // White noise burst filtered
   const bufferSize = c.sampleRate * 0.15;
   const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
   const data = buffer.getChannelData(0);
@@ -124,6 +123,57 @@ export function playWhoosh() {
   source.start(c.currentTime);
 }
 
+export function playDarknessWarning() {
+  if (muted) return;
+  const c = getCtx();
+  // Eerie descending tone
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(600, c.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(200, c.currentTime + 0.8);
+  gain.gain.setValueAtTime(0.1, c.currentTime);
+  gain.gain.linearRampToValueAtTime(0, c.currentTime + 1.0);
+  osc.connect(gain).connect(c.destination);
+  osc.start(c.currentTime);
+  osc.stop(c.currentTime + 1.0);
+}
+
+export function playMultiverseActivate() {
+  if (muted) return;
+  const c = getCtx();
+  // Dramatic ascending chord
+  const freqs = [200, 300, 400, 600];
+  freqs.forEach((freq, i) => {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const start = c.currentTime + i * 0.05;
+    gain.gain.setValueAtTime(0.08, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
+    osc.connect(gain).connect(c.destination);
+    osc.start(start);
+    osc.stop(start + 0.4);
+  });
+}
+
+export function playAdrenalineActivate() {
+  if (muted) return;
+  const c = getCtx();
+  // Power-up whoosh + ascending tone
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(200, c.currentTime);
+  osc.frequency.linearRampToValueAtTime(800, c.currentTime + 0.3);
+  gain.gain.setValueAtTime(0.1, c.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.3);
+  osc.connect(gain).connect(c.destination);
+  osc.start(c.currentTime);
+  osc.stop(c.currentTime + 0.3);
+}
+
 // Procedural lofi background music
 export function startMusic(speedMultiplier: number = 1) {
   if (musicPlaying) {
@@ -141,7 +191,7 @@ export function startMusic(speedMultiplier: number = 1) {
 }
 
 function scheduleBeats(c: AudioContext, masterGain: GainNode) {
-  const notes = [130.81, 164.81, 196.00, 220.00, 261.63, 196.00, 164.81, 146.83]; // C3-based
+  const notes = [130.81, 164.81, 196.00, 220.00, 261.63, 196.00, 164.81, 146.83];
   let beatIndex = 0;
 
   const playBeat = () => {
@@ -149,7 +199,6 @@ function scheduleBeats(c: AudioContext, masterGain: GainNode) {
     const now = c.currentTime;
     const note = notes[beatIndex % notes.length];
     
-    // Bass
     const bass = c.createOscillator();
     const bassGain = c.createGain();
     bass.type = 'triangle';
@@ -160,7 +209,6 @@ function scheduleBeats(c: AudioContext, masterGain: GainNode) {
     bass.start(now);
     bass.stop(now + 0.2);
 
-    // Kick on even beats
     if (beatIndex % 2 === 0) {
       const kick = c.createOscillator();
       const kickGain = c.createGain();
@@ -174,7 +222,6 @@ function scheduleBeats(c: AudioContext, masterGain: GainNode) {
       kick.stop(now + 0.12);
     }
 
-    // Hi-hat on odd beats
     if (beatIndex % 2 === 1) {
       const bufLen = c.sampleRate * 0.04;
       const buf = c.createBuffer(1, bufLen, c.sampleRate);
@@ -201,7 +248,6 @@ function scheduleBeats(c: AudioContext, masterGain: GainNode) {
 }
 
 export function updateMusicTempo(speedMultiplier: number) {
-  // Gradually increase BPM with speed
   currentBPM = Math.min(160, 90 + (speedMultiplier - 1) * 60);
 }
 

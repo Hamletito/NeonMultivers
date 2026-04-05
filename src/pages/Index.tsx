@@ -6,7 +6,7 @@ import GameOverScreen from '../components/GameOverScreen';
 import ShopScreen from '../components/ShopScreen';
 import PauseOverlay from '../components/PauseOverlay';
 import { GameState, ShopItem } from '../game/types';
-import { createInitialState, resetForNewGame } from '../game/engine';
+import { createInitialState, resetForNewGame, activateAdrenaline } from '../game/engine';
 import { toggleMute, isMuted, startMusic, stopMusic } from '../game/audio';
 
 const Index = () => {
@@ -73,6 +73,10 @@ const Index = () => {
     });
   }, []);
 
+  const handleAdrenaline = useCallback(() => {
+    setState(s => activateAdrenaline({ ...s }));
+  }, []);
+
   const handleToggleMute = useCallback(() => {
     toggleMute();
     setMuted(isMuted());
@@ -86,6 +90,7 @@ const Index = () => {
         state={state}
         onPause={handlePause}
         onActivatePower={handleActivatePower}
+        onAdrenaline={handleAdrenaline}
         isMuted={muted}
         onToggleMute={handleToggleMute}
       />

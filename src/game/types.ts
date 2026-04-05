@@ -51,7 +51,6 @@ export interface Particle {
   maxLife: number;
   color: string;
   size: number;
-  // Death animation particles
   isDeathPiece?: boolean;
   width?: number;
   height?: number;
@@ -80,6 +79,12 @@ export interface DeathAnimation {
   x: number;
   y: number;
   color: string;
+}
+
+export interface GhostFrame {
+  distance: number;
+  y: number;
+  isJumping: boolean;
 }
 
 export interface GameState {
@@ -115,8 +120,8 @@ export interface GameState {
   newRecordShown: boolean;
   // Color shift & disruption
   colorShiftIndex: number;
-  colorShiftTransition: number; // 0-1, how far into transition
-  disruptionType: number; // 0=none, 1=invisible obs, 2=invert, 3=no line
+  colorShiftTransition: number;
+  disruptionType: number;
   disruptionTimer: number;
   lastColorShiftAt: number;
   lastDisruptionAt: number;
@@ -124,4 +129,31 @@ export interface GameState {
   deathAnim: DeathAnimation | null;
   // Audio events for this frame
   audioEvents: string[];
+  // Run count for invisible tutorial
+  runCount: number;
+  // Ghost replay
+  ghostFrames: GhostFrame[];
+  bestGhostFrames: GhostFrame[];
+  ghostIndex: number;
+  // Adrenaline
+  adrenaline: number; // 0-100
+  adrenalineActive: boolean;
+  adrenalineTimer: number;
+  lastDodgeTime: number;
+  // Cinematic new record
+  cinematicSlowMo: number; // remaining ms, 0 = inactive
+  cinematicTriggered: boolean;
+  // Darkness mode
+  darknessActive: boolean;
+  darknessTimer: number;
+  darknessDuration: number;
+  nextDarknessAt: number;
+  darknessWarning: number; // countdown before darkness
+  darknessFade: number; // 0-1 for smooth fade
+  // Multiverse
+  multiverseActive: boolean;
+  multiverseTimer: number;
+  multiverseDuration: number;
+  nextMultiverseAt: number;
+  multiverseOffsets: number[]; // x offsets for obstacle rendering in each quadrant
 }
