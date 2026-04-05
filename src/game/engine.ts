@@ -364,8 +364,18 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   }
 
   for (const obs of state.obstacles) {
-    if (obs.type === 'bouncing_ball' && obs.bouncePhase !== undefined && obs.baseY !== undefined) { obs.bouncePhase += (obs.bounceSpeed || 0.004) * dt; obs.y = obs.baseY - Math.abs(Math.sin(obs.bouncePhase)) * canvasH * 0.4; }
+    if (obs.type === 'bouncing_ball' && obs.bouncePhase !== undefined && obs.baseY !== undefined) { obs.bouncePhase += (obs.bounceSpeed || 0.004) * dt; obs.y = obs.baseY - Math.abs(Math.sin(obs.bouncePhase)) * canvasH * 0.5; }
     if (obs.type === 'pendulum' && obs.swingPhase !== undefined && obs.anchorX !== undefined) { obs.swingPhase += (obs.swingSpeed || 0.003) * dt; const a = Math.sin(obs.swingPhase) * 0.6; const pLen = obs.pendulumLength || 120; obs.x = obs.anchorX + Math.sin(a) * pLen; obs.y = Math.cos(a) * pLen; }
+    if (obs.type === 'expanding' && obs.expandBaseSize !== undefined && obs.expandMaxSize !== undefined) {
+      obs.expandPhase = (obs.expandPhase || 0) + dt * 0.002;
+      const t = (Math.sin(obs.expandPhase) + 1) / 2;
+      obs.size = obs.expandBaseSize + t * (obs.expandMaxSize - obs.expandBaseSize);
+      obs.y = lineY - obs.size / 2;
+    }
+    if (obs.type === 'intermittent') {
+      obs.intermittentPhase = (obs.intermittentPhase || 0) + dt;
+      if (obs.intermittentPhase >= 800) { obs.intermittentPhase = 0; obs.intermittentVisible = !obs.intermittentVisible; }
+    }
   }
 
   const visibleCount = state.obstacles.filter(o => o.x + o.size / 2 >= 0 && o.x - o.size / 2 <= canvasW).length;
