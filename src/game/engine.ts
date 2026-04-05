@@ -114,15 +114,17 @@ function isHardObstacle(obstacle: Obstacle) {
   return (obstacle.type === 'circle' || obstacle.type === 'star' || obstacle.type === 'spike_row' || obstacle.type === 'bouncing_ball') && obstacle.size >= 30;
 }
 
-function createObstacle(canvasW: number, lineY: number, isTop: boolean, distance: number, mustBeEasy: boolean, _canvasH: number): Obstacle {
+function createObstacle(canvasW: number, lineY: number, isTop: boolean, distance: number, mustBeEasy: boolean, canvasH: number): Obstacle {
   const type = chooseObstacleType(distance, mustBeEasy);
   const size = getObstacleSize(type, distance, mustBeEasy);
   const spawnX = canvasW + OBSTACLE_SPAWN_X_OFFSET;
-  if (type === 'spike_row') { const count = 3 + Math.floor(Math.random() * 3); return { x: spawnX, y: isTop ? lineY - 12 : lineY + 12, type, size: 24, isTop, spikeCount: count }; }
+  if (type === 'spike_row') { const count = 3 + Math.floor(Math.random() * 3); return { x: spawnX, y: lineY - 12, type, size: 24, isTop: true, spikeCount: count }; }
   if (type === 'bouncing_ball') return { x: spawnX, y: lineY - 20, type, size: 18, isTop: true, bouncePhase: Math.random() * Math.PI * 2, bounceSpeed: 0.004, baseY: lineY };
-  if (type === 'pendulum') { const pLen = 100 + Math.random() * 60; return { x: spawnX, y: 0, type, size: 20, isTop: true, swingPhase: Math.random() * Math.PI * 2, swingSpeed: 0.003, anchorX: spawnX, pendulumLength: pLen }; }
+  if (type === 'pendulum') { const jumpH = getJumpHeight(); const pLen = lineY - jumpH; return { x: spawnX, y: 0, type, size: 20, isTop: true, swingPhase: Math.random() * Math.PI * 2, swingSpeed: 0.003, anchorX: spawnX, pendulumLength: Math.max(60, pLen) }; }
   if (type === 'gap') { const gw = 80 + Math.random() * 40; return { x: spawnX, y: lineY, type, size: gw, isTop: true, gapWidth: gw }; }
   if (type === 'ceiling_spikes') return { x: spawnX, y: 30, type, size: 35, isTop: true };
+  if (type === 'expanding') { const baseS = 12; const maxS = 28 + Math.random() * 16; return { x: spawnX, y: lineY - baseS / 2, type, size: baseS, isTop: true, expandPhase: 0, expandBaseSize: baseS, expandMaxSize: maxS }; }
+  if (type === 'intermittent') return { x: spawnX, y: lineY - size / 2, type, size: 26, isTop: true, intermittentPhase: 0, intermittentVisible: true };
   const y = isTop ? lineY - size / 2 : lineY + size / 2;
   return { x: spawnX, y, type, size, isTop };
 }
