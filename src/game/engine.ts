@@ -592,6 +592,8 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
       case 'pendulum': { const anchorY = 0; ctx.strokeStyle = obsColor; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(obs.x, anchorY); ctx.lineTo(obs.x, obs.y); ctx.stroke(); ctx.fillStyle = obsColor; const bw = obs.size; const bh = (obs.pendulumLength || 120) * 0.15; ctx.fillRect(obs.x - bw / 2, obs.y - bh / 2, bw, bh); break; }
       case 'gap': { const gw = obs.gapWidth || 100; ctx.fillStyle = obsColor; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(Date.now() * 0.005); const ts = 8; ctx.beginPath(); ctx.moveTo(obs.x - gw / 2, lineY - ts); ctx.lineTo(obs.x - gw / 2 + ts, lineY); ctx.lineTo(obs.x - gw / 2, lineY + ts); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(obs.x + gw / 2, lineY - ts); ctx.lineTo(obs.x + gw / 2 - ts, lineY); ctx.lineTo(obs.x + gw / 2, lineY + ts); ctx.closePath(); ctx.fill(); break; }
       case 'ceiling_spikes': { ctx.fillStyle = obsColor; const cc = 5; const csw = 14; const csh = 35; const csx = obs.x - (cc * csw) / 2; for (let i = 0; i < cc; i++) { const x = csx + i * csw + csw / 2; ctx.beginPath(); ctx.moveTo(x - csw / 2, 0); ctx.lineTo(x, csh); ctx.lineTo(x + csw / 2, 0); ctx.closePath(); ctx.fill(); } break; }
+      case 'expanding': { ctx.fillStyle = obsColor; ctx.fillRect(obs.x - obs.size / 2, lineY - obs.size, obs.size, obs.size); break; }
+      case 'intermittent': { ctx.fillStyle = obsColor; ctx.fillRect(obs.x - obs.size / 2, obs.y - obs.size / 2, obs.size, obs.size); break; }
     }
     ctx.restore();
   }
