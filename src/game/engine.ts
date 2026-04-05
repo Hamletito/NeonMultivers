@@ -446,7 +446,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   }
 
   for (const obs of state.obstacles) {
-    if (obs.type === 'gap' || obs.type === 'ceiling_spikes' || obs.type === 'bouncing_ball') {
+    if (obs.type === 'gap' || obs.type === 'ceiling_spikes' || obs.type === 'bouncing_ball' || obs.type === 'pendulum' || obs.type === 'expanding' || obs.type === 'intermittent') {
       for (const p of [pt, state.playerBottom].filter(Boolean) as Player[]) {
         if (checkCollision(p, obs, lineY)) {
           if (state.hasShield) { state.hasShield = false; state.obstacles = state.obstacles.filter(o => o !== obs); addParticles(state.particles, p.x, p.y, '#00ffcc', 15); }
