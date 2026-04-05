@@ -87,11 +87,11 @@ function chooseObstacleType(distance: number, mustBeEasy: boolean): Obstacle['ty
   const phase = getPhase(distance);
   if (mustBeEasy || phase === 1) return randomFrom(['triangle', 'diamond']);
   if (phase === 2) {
-    const types: Obstacle['type'][] = ['triangle', 'diamond', 'circle', 'star'];
+    const types: Obstacle['type'][] = ['triangle', 'diamond', 'circle', 'star', 'expanding', 'intermittent'];
     if (distance >= 300) types.push('gap');
     return randomFrom(types);
   }
-  const types: Obstacle['type'][] = ['triangle', 'circle', 'diamond', 'spike', 'star', 'spike_row', 'bouncing_ball'];
+  const types: Obstacle['type'][] = ['triangle', 'circle', 'diamond', 'spike', 'star', 'spike_row', 'bouncing_ball', 'expanding', 'intermittent'];
   if (distance >= 300) types.push('gap');
   if (distance >= 400) types.push('pendulum');
   if (distance >= 500) types.push('ceiling_spikes');
