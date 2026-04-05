@@ -221,7 +221,7 @@ function getDeathType(obsType: Obstacle['type']): DeathAnimation['type'] {
     case 'triangle': return 'triangle_split';
     case 'circle': return 'circle_bounce';
     case 'bouncing_ball': return 'ball_flatten';
-    case 'spike_row': case 'spike': case 'ceiling_spikes': return 'spike_shatter';
+    case 'spike_row': case 'spike': case 'ceiling_spikes': case 'expanding': case 'intermittent': return 'spike_shatter';
     case 'gap': return 'gap_fall';
     default: return 'default';
   }
