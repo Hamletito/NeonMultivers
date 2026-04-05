@@ -87,11 +87,11 @@ function chooseObstacleType(distance: number, mustBeEasy: boolean): Obstacle['ty
   const phase = getPhase(distance);
   if (mustBeEasy || phase === 1) return randomFrom(['triangle', 'diamond']);
   if (phase === 2) {
-    const types: Obstacle['type'][] = ['triangle', 'diamond', 'circle', 'star'];
+    const types: Obstacle['type'][] = ['triangle', 'diamond', 'circle', 'star', 'expanding', 'intermittent'];
     if (distance >= 300) types.push('gap');
     return randomFrom(types);
   }
-  const types: Obstacle['type'][] = ['triangle', 'circle', 'diamond', 'spike', 'star', 'spike_row', 'bouncing_ball'];
+  const types: Obstacle['type'][] = ['triangle', 'circle', 'diamond', 'spike', 'star', 'spike_row', 'bouncing_ball', 'expanding', 'intermittent'];
   if (distance >= 300) types.push('gap');
   if (distance >= 400) types.push('pendulum');
   if (distance >= 500) types.push('ceiling_spikes');
@@ -99,7 +99,7 @@ function chooseObstacleType(distance: number, mustBeEasy: boolean): Obstacle['ty
 }
 
 function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: boolean) {
-  if (type === 'spike_row' || type === 'bouncing_ball' || type === 'pendulum' || type === 'gap' || type === 'ceiling_spikes') return 30;
+  if (type === 'spike_row' || type === 'bouncing_ball' || type === 'pendulum' || type === 'gap' || type === 'ceiling_spikes' || type === 'expanding' || type === 'intermittent') return 30;
   const cap = getObstacleSizeCap(type, distance);
   const phase = getPhase(distance);
   let minSize = type === 'triangle' || type === 'spike' ? 24 : 22;
@@ -114,15 +114,17 @@ function isHardObstacle(obstacle: Obstacle) {
   return (obstacle.type === 'circle' || obstacle.type === 'star' || obstacle.type === 'spike_row' || obstacle.type === 'bouncing_ball') && obstacle.size >= 30;
 }
 
-function createObstacle(canvasW: number, lineY: number, isTop: boolean, distance: number, mustBeEasy: boolean, _canvasH: number): Obstacle {
+function createObstacle(canvasW: number, lineY: number, isTop: boolean, distance: number, mustBeEasy: boolean, canvasH: number): Obstacle {
   const type = chooseObstacleType(distance, mustBeEasy);
   const size = getObstacleSize(type, distance, mustBeEasy);
   const spawnX = canvasW + OBSTACLE_SPAWN_X_OFFSET;
-  if (type === 'spike_row') { const count = 3 + Math.floor(Math.random() * 3); return { x: spawnX, y: isTop ? lineY - 12 : lineY + 12, type, size: 24, isTop, spikeCount: count }; }
+  if (type === 'spike_row') { const count = 3 + Math.floor(Math.random() * 3); return { x: spawnX, y: lineY - 12, type, size: 24, isTop: true, spikeCount: count }; }
   if (type === 'bouncing_ball') return { x: spawnX, y: lineY - 20, type, size: 18, isTop: true, bouncePhase: Math.random() * Math.PI * 2, bounceSpeed: 0.004, baseY: lineY };
-  if (type === 'pendulum') { const pLen = 100 + Math.random() * 60; return { x: spawnX, y: 0, type, size: 20, isTop: true, swingPhase: Math.random() * Math.PI * 2, swingSpeed: 0.003, anchorX: spawnX, pendulumLength: pLen }; }
+  if (type === 'pendulum') { const jumpH = getJumpHeight(); const pLen = lineY - jumpH; return { x: spawnX, y: 0, type, size: 20, isTop: true, swingPhase: Math.random() * Math.PI * 2, swingSpeed: 0.003, anchorX: spawnX, pendulumLength: Math.max(60, pLen) }; }
   if (type === 'gap') { const gw = 80 + Math.random() * 40; return { x: spawnX, y: lineY, type, size: gw, isTop: true, gapWidth: gw }; }
   if (type === 'ceiling_spikes') return { x: spawnX, y: 30, type, size: 35, isTop: true };
+  if (type === 'expanding') { const baseS = 12; const maxS = 28 + Math.random() * 16; return { x: spawnX, y: lineY - baseS / 2, type, size: baseS, isTop: true, expandPhase: 0, expandBaseSize: baseS, expandMaxSize: maxS }; }
+  if (type === 'intermittent') return { x: spawnX, y: lineY - size / 2, type, size: 26, isTop: true, intermittentPhase: 0, intermittentVisible: true };
   const y = isTop ? lineY - size / 2 : lineY + size / 2;
   return { x: spawnX, y, type, size, isTop };
 }
@@ -197,10 +199,12 @@ function addLandingParticles(particles: Particle[], p: Player, lineY: number, co
 function checkCollision(player: Player, obs: Obstacle, lineY: number): boolean {
   const shrink = 0.85;
   if (obs.type === 'gap') { const gw = obs.gapWidth || 100; return player.x > obs.x - gw / 2 && player.x < obs.x + gw / 2 && !player.isJumping; }
+  if (obs.type === 'intermittent' && !obs.intermittentVisible) return false;
   if (obs.type === 'spike_row') { const totalWidth = (obs.spikeCount || 3) * 16; const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y); return dx < (player.size / 2 + totalWidth / 2) * shrink && dy < (player.size / 2 + obs.size / 2) * shrink; }
   if (obs.type === 'bouncing_ball') { const dx = player.x - obs.x; const dy = player.y - obs.y; return Math.sqrt(dx * dx + dy * dy) < (player.size / 2 + obs.size / 2) * shrink; }
-  if (obs.type === 'pendulum') { const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y); return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + (obs.pendulumLength || 100) * 0.15) * shrink; }
+  if (obs.type === 'pendulum') { const bh = (obs.pendulumLength || 120) * 0.15; const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y); return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + bh / 2) * shrink; }
   if (obs.type === 'ceiling_spikes') { const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y); return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + 20) * shrink; }
+  if (obs.type === 'expanding') { const s = obs.size; const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - (lineY - s / 2)); return dx < (player.size / 2 + s / 2) * shrink && dy < (player.size / 2 + s / 2) * shrink; }
   const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y);
   return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + obs.size / 2) * shrink;
 }
@@ -217,7 +221,7 @@ function getDeathType(obsType: Obstacle['type']): DeathAnimation['type'] {
     case 'triangle': return 'triangle_split';
     case 'circle': return 'circle_bounce';
     case 'bouncing_ball': return 'ball_flatten';
-    case 'spike_row': case 'spike': case 'ceiling_spikes': return 'spike_shatter';
+    case 'spike_row': case 'spike': case 'ceiling_spikes': case 'expanding': case 'intermittent': return 'spike_shatter';
     case 'gap': return 'gap_fall';
     default: return 'default';
   }
@@ -360,8 +364,18 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   }
 
   for (const obs of state.obstacles) {
-    if (obs.type === 'bouncing_ball' && obs.bouncePhase !== undefined && obs.baseY !== undefined) { obs.bouncePhase += (obs.bounceSpeed || 0.004) * dt; obs.y = obs.baseY - Math.abs(Math.sin(obs.bouncePhase)) * canvasH * 0.4; }
+    if (obs.type === 'bouncing_ball' && obs.bouncePhase !== undefined && obs.baseY !== undefined) { obs.bouncePhase += (obs.bounceSpeed || 0.004) * dt; obs.y = obs.baseY - Math.abs(Math.sin(obs.bouncePhase)) * canvasH * 0.5; }
     if (obs.type === 'pendulum' && obs.swingPhase !== undefined && obs.anchorX !== undefined) { obs.swingPhase += (obs.swingSpeed || 0.003) * dt; const a = Math.sin(obs.swingPhase) * 0.6; const pLen = obs.pendulumLength || 120; obs.x = obs.anchorX + Math.sin(a) * pLen; obs.y = Math.cos(a) * pLen; }
+    if (obs.type === 'expanding' && obs.expandBaseSize !== undefined && obs.expandMaxSize !== undefined) {
+      obs.expandPhase = (obs.expandPhase || 0) + dt * 0.002;
+      const t = (Math.sin(obs.expandPhase) + 1) / 2;
+      obs.size = obs.expandBaseSize + t * (obs.expandMaxSize - obs.expandBaseSize);
+      obs.y = lineY - obs.size / 2;
+    }
+    if (obs.type === 'intermittent') {
+      obs.intermittentPhase = (obs.intermittentPhase || 0) + dt;
+      if (obs.intermittentPhase >= 800) { obs.intermittentPhase = 0; obs.intermittentVisible = !obs.intermittentVisible; }
+    }
   }
 
   const visibleCount = state.obstacles.filter(o => o.x + o.size / 2 >= 0 && o.x - o.size / 2 <= canvasW).length;
@@ -372,7 +386,9 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if (isFirstObstacle) candidate = { x: canvasW + OBSTACLE_SPAWN_X_OFFSET, y: (canvasH - BANNER_HEIGHT) / 2 - 15, type: 'triangle', size: 28, isTop: true };
     else candidate = createObstacle(canvasW, (canvasH - BANNER_HEIGHT) / 2, spawnOnTop, state.distance, mustBeEasy, canvasH);
 
+    const MIN_ABSOLUTE_GAP = 350 - Math.min(150, state.distance * 0.15);
     let requiredGapPx = patternGapPending ? spawnProfile.maxGap * 1.3 : randomBetween(spawnProfile.minGap, spawnProfile.maxGap);
+    requiredGapPx = Math.max(requiredGapPx, MIN_ABSOLUTE_GAP);
     if (isFirstObstacle) requiredGapPx = Math.max(requiredGapPx, SAFE_SPAWN_ZONE);
     const rightmost = state.obstacles.length > 0 ? Math.max(...state.obstacles.map(o => o.x + o.size / 2)) : state.playerTop.x - SAFE_SPAWN_ZONE;
     if (state.obstacles.length === 0 || rightmost <= candidate.x - candidate.size / 2 - requiredGapPx) {
@@ -430,7 +446,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   }
 
   for (const obs of state.obstacles) {
-    if (obs.type === 'gap' || obs.type === 'ceiling_spikes' || obs.type === 'bouncing_ball') {
+    if (obs.type === 'gap' || obs.type === 'ceiling_spikes' || obs.type === 'bouncing_ball' || obs.type === 'pendulum' || obs.type === 'expanding' || obs.type === 'intermittent') {
       for (const p of [pt, state.playerBottom].filter(Boolean) as Player[]) {
         if (checkCollision(p, obs, lineY)) {
           if (state.hasShield) { state.hasShield = false; state.obstacles = state.obstacles.filter(o => o !== obs); addParticles(state.particles, p.x, p.y, '#00ffcc', 15); }
@@ -554,9 +570,11 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   // Obstacles
   const obsColor = invisibleObs ? theme.bg : (invertActive ? '#222' : theme.obstacle);
   for (const obs of state.obstacles) {
+    if (obs.type === 'intermittent' && !obs.intermittentVisible) { ctx.save(); ctx.globalAlpha = 0.15; ctx.strokeStyle = obsColor; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(obs.x, obs.y, obs.size / 2, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); continue; }
     ctx.save();
+    // Ground shadow — always visible even during invisible disruption
     if (obs.type !== 'gap' && obs.type !== 'ceiling_spikes' && obs.type !== 'pendulum') {
-      ctx.save(); ctx.globalAlpha = invisibleObs ? 0 : 0.25; ctx.fillStyle = obsColor;
+      ctx.save(); ctx.globalAlpha = invisibleObs ? 0.35 : 0.25; ctx.fillStyle = invisibleObs ? 'rgba(0,0,0,0.6)' : obsColor;
       ctx.beginPath(); ctx.ellipse(obs.x, lineY, obs.size / 2 + 4, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     }
     ctx.fillStyle = obsColor; ctx.shadowColor = obsColor; ctx.shadowBlur = invisibleObs ? 0 : 10;
@@ -574,6 +592,8 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
       case 'pendulum': { const anchorY = 0; ctx.strokeStyle = obsColor; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(obs.x, anchorY); ctx.lineTo(obs.x, obs.y); ctx.stroke(); ctx.fillStyle = obsColor; const bw = obs.size; const bh = (obs.pendulumLength || 120) * 0.15; ctx.fillRect(obs.x - bw / 2, obs.y - bh / 2, bw, bh); break; }
       case 'gap': { const gw = obs.gapWidth || 100; ctx.fillStyle = obsColor; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(Date.now() * 0.005); const ts = 8; ctx.beginPath(); ctx.moveTo(obs.x - gw / 2, lineY - ts); ctx.lineTo(obs.x - gw / 2 + ts, lineY); ctx.lineTo(obs.x - gw / 2, lineY + ts); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(obs.x + gw / 2, lineY - ts); ctx.lineTo(obs.x + gw / 2 - ts, lineY); ctx.lineTo(obs.x + gw / 2, lineY + ts); ctx.closePath(); ctx.fill(); break; }
       case 'ceiling_spikes': { ctx.fillStyle = obsColor; const cc = 5; const csw = 14; const csh = 35; const csx = obs.x - (cc * csw) / 2; for (let i = 0; i < cc; i++) { const x = csx + i * csw + csw / 2; ctx.beginPath(); ctx.moveTo(x - csw / 2, 0); ctx.lineTo(x, csh); ctx.lineTo(x + csw / 2, 0); ctx.closePath(); ctx.fill(); } break; }
+      case 'expanding': { ctx.fillStyle = obsColor; ctx.fillRect(obs.x - obs.size / 2, lineY - obs.size, obs.size, obs.size); break; }
+      case 'intermittent': { ctx.fillStyle = obsColor; ctx.fillRect(obs.x - obs.size / 2, obs.y - obs.size / 2, obs.size, obs.size); break; }
     }
     ctx.restore();
   }

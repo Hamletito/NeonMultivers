@@ -16,7 +16,7 @@ export interface Player {
 export interface Obstacle {
   x: number;
   y: number;
-  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond' | 'spike_row' | 'bouncing_ball' | 'pendulum' | 'gap' | 'ceiling_spikes';
+  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond' | 'spike_row' | 'bouncing_ball' | 'pendulum' | 'gap' | 'ceiling_spikes' | 'expanding' | 'intermittent';
   size: number;
   isTop: boolean;
   bouncePhase?: number;
@@ -28,6 +28,11 @@ export interface Obstacle {
   pendulumLength?: number;
   spikeCount?: number;
   gapWidth?: number;
+  expandPhase?: number;
+  expandBaseSize?: number;
+  expandMaxSize?: number;
+  intermittentPhase?: number;
+  intermittentVisible?: boolean;
 }
 
 export interface Coin {
