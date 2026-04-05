@@ -199,10 +199,12 @@ function addLandingParticles(particles: Particle[], p: Player, lineY: number, co
 function checkCollision(player: Player, obs: Obstacle, lineY: number): boolean {
   const shrink = 0.85;
   if (obs.type === 'gap') { const gw = obs.gapWidth || 100; return player.x > obs.x - gw / 2 && player.x < obs.x + gw / 2 && !player.isJumping; }
+  if (obs.type === 'intermittent' && !obs.intermittentVisible) return false;
   if (obs.type === 'spike_row') { const totalWidth = (obs.spikeCount || 3) * 16; const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y); return dx < (player.size / 2 + totalWidth / 2) * shrink && dy < (player.size / 2 + obs.size / 2) * shrink; }
   if (obs.type === 'bouncing_ball') { const dx = player.x - obs.x; const dy = player.y - obs.y; return Math.sqrt(dx * dx + dy * dy) < (player.size / 2 + obs.size / 2) * shrink; }
-  if (obs.type === 'pendulum') { const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y); return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + (obs.pendulumLength || 100) * 0.15) * shrink; }
+  if (obs.type === 'pendulum') { const bh = (obs.pendulumLength || 120) * 0.15; const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y); return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + bh / 2) * shrink; }
   if (obs.type === 'ceiling_spikes') { const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y); return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + 20) * shrink; }
+  if (obs.type === 'expanding') { const s = obs.size; const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - (lineY - s / 2)); return dx < (player.size / 2 + s / 2) * shrink && dy < (player.size / 2 + s / 2) * shrink; }
   const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y);
   return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + obs.size / 2) * shrink;
 }
