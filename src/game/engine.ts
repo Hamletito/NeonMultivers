@@ -570,9 +570,11 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   // Obstacles
   const obsColor = invisibleObs ? theme.bg : (invertActive ? '#222' : theme.obstacle);
   for (const obs of state.obstacles) {
+    if (obs.type === 'intermittent' && !obs.intermittentVisible) { ctx.save(); ctx.globalAlpha = 0.15; ctx.strokeStyle = obsColor; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(obs.x, obs.y, obs.size / 2, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); continue; }
     ctx.save();
+    // Ground shadow — always visible even during invisible disruption
     if (obs.type !== 'gap' && obs.type !== 'ceiling_spikes' && obs.type !== 'pendulum') {
-      ctx.save(); ctx.globalAlpha = invisibleObs ? 0 : 0.25; ctx.fillStyle = obsColor;
+      ctx.save(); ctx.globalAlpha = invisibleObs ? 0.35 : 0.25; ctx.fillStyle = invisibleObs ? 'rgba(0,0,0,0.6)' : obsColor;
       ctx.beginPath(); ctx.ellipse(obs.x, lineY, obs.size / 2 + 4, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     }
     ctx.fillStyle = obsColor; ctx.shadowColor = obsColor; ctx.shadowBlur = invisibleObs ? 0 : 10;
