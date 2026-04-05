@@ -99,7 +99,7 @@ function chooseObstacleType(distance: number, mustBeEasy: boolean): Obstacle['ty
 }
 
 function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: boolean) {
-  if (type === 'spike_row' || type === 'bouncing_ball' || type === 'pendulum' || type === 'gap' || type === 'ceiling_spikes') return 30;
+  if (type === 'spike_row' || type === 'bouncing_ball' || type === 'pendulum' || type === 'gap' || type === 'ceiling_spikes' || type === 'expanding' || type === 'intermittent') return 30;
   const cap = getObstacleSizeCap(type, distance);
   const phase = getPhase(distance);
   let minSize = type === 'triangle' || type === 'spike' ? 24 : 22;
