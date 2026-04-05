@@ -386,7 +386,9 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if (isFirstObstacle) candidate = { x: canvasW + OBSTACLE_SPAWN_X_OFFSET, y: (canvasH - BANNER_HEIGHT) / 2 - 15, type: 'triangle', size: 28, isTop: true };
     else candidate = createObstacle(canvasW, (canvasH - BANNER_HEIGHT) / 2, spawnOnTop, state.distance, mustBeEasy, canvasH);
 
+    const MIN_ABSOLUTE_GAP = 350 - Math.min(150, state.distance * 0.15);
     let requiredGapPx = patternGapPending ? spawnProfile.maxGap * 1.3 : randomBetween(spawnProfile.minGap, spawnProfile.maxGap);
+    requiredGapPx = Math.max(requiredGapPx, MIN_ABSOLUTE_GAP);
     if (isFirstObstacle) requiredGapPx = Math.max(requiredGapPx, SAFE_SPAWN_ZONE);
     const rightmost = state.obstacles.length > 0 ? Math.max(...state.obstacles.map(o => o.x + o.size / 2)) : state.playerTop.x - SAFE_SPAWN_ZONE;
     if (state.obstacles.length === 0 || rightmost <= candidate.x - candidate.size / 2 - requiredGapPx) {
