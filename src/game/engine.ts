@@ -239,17 +239,13 @@ export function createInitialState(): GameState {
     lastDodgeTime: 0,
     cinematicSlowMo: 0,
     cinematicTriggered: false,
-    darknessActive: false,
-    darknessTimer: 0,
-    darknessDuration: 0,
-    nextDarknessAt: 400 + Math.random() * 200,
-    darknessWarning: 0,
-    darknessFade: 0,
     multiverseActive: false,
     multiverseTimer: 0,
     multiverseDuration: 0,
     nextMultiverseAt: 300 + Math.random() * 200,
     multiverseOffsets: [0, 80, -60, 40],
+    multiverseTextTimer: 0,
+    multiverseMergeTimer: 0,
   };
 }
 
