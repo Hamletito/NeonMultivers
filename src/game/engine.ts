@@ -1023,33 +1023,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.fillText('⚠ DISRUPTION ⚠', canvasW / 2, 20); ctx.restore();
   }
 
-  // Darkness mode overlay
-  if (state.darknessFade > 0 && state.screen === 'playing') {
-    ctx.save();
-    // Create darkness mask — black everywhere except around player
-    const playerX = state.playerTop.x;
-    const playerY = state.playerTop.y;
-    const radius = 80;
-    ctx.globalAlpha = state.darknessFade * 0.95;
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, canvasW, h);
-    // Cut out circle around player
-    ctx.globalCompositeOperation = 'destination-out';
-    const grad = ctx.createRadialGradient(playerX, playerY, 0, playerX, playerY, radius);
-    grad.addColorStop(0, 'rgba(0,0,0,1)');
-    grad.addColorStop(0.7, 'rgba(0,0,0,0.8)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(playerX - radius, playerY - radius, radius * 2, radius * 2);
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.restore();
-  }
-
-  // Darkness warning flicker
-  if (state.darknessWarning > 0 && state.screen === 'playing') {
-    const flicker = Math.sin(Date.now() * 0.02) > 0 ? 0.1 : 0;
-    ctx.save(); ctx.globalAlpha = flicker; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, canvasW, h); ctx.restore();
-  }
 
   ctx.restore();
 
