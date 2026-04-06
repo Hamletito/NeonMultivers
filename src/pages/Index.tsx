@@ -14,7 +14,15 @@ const Index = () => {
   const [muted, setMuted] = useState(isMuted());
 
   const handlePlay = useCallback(() => {
-    setState(s => resetForNewGame(s));
+    setState(s => resetForNewGame({ ...s, ghostMode: false }));
+    startMusic(1);
+  }, []);
+
+  const handleGhostMode = useCallback(() => {
+    setState(s => {
+      if (s.bestGhostFrames.length === 0) return s;
+      return resetForNewGame({ ...s, ghostMode: true });
+    });
     startMusic(1);
   }, []);
 
@@ -85,7 +93,7 @@ const Index = () => {
   return (
     <div className="w-full h-screen overflow-hidden bg-background">
       <GameCanvas state={state} onStateChange={setState} />
-      <MenuScreen state={state} onPlay={handlePlay} onShop={handleShop} />
+      <MenuScreen state={state} onPlay={handlePlay} onShop={handleShop} onGhostMode={handleGhostMode} />
       <HUD
         state={state}
         onPause={handlePause}
