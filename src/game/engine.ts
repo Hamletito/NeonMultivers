@@ -43,6 +43,10 @@ let passedObstacleIds = new Set<number>();
 let obstacleIdCounter = 0;
 let prevStreakMult = 1;
 
+// Per-quadrant spawn counters for multiverse
+let mvObstacleCounters = [0, 0, 0];
+let mvLastSpawnX = [0, 0, 0];
+
 const TAUNT_MESSAGES: Record<number, string> = {
   100: "Is that all you got?",
   300: "Not bad... for now",
@@ -77,23 +81,17 @@ function incrementRunCount() {
 
 function getSpawnProfile(distance: number, runCount: number) {
   const phase = getPhase(distance);
-  // Tutorial overrides for first 3 runs
-  if (runCount <= 1) {
-    return { minGap: 600, maxGap: 700, maxSize: 30, speedMult: 0.85, hardChance: 0, maxBurst: 1 };
-  }
+  if (runCount <= 1) return { minGap: 600, maxGap: 700, maxSize: 30, speedMult: 0.85, hardChance: 0, maxBurst: 1 };
   if (runCount === 2) {
-    const p = phase <= 2
+    return phase <= 2
       ? { minGap: 500, maxGap: 600, maxSize: 35, speedMult: 0.95, hardChance: 0, maxBurst: 1 }
       : { minGap: 400, maxGap: 500, maxSize: 40, speedMult: 1.0, hardChance: 0.05, maxBurst: 2 };
-    return p;
   }
   if (runCount === 3) {
-    const p = phase <= 2
+    return phase <= 2
       ? { minGap: 400, maxGap: 550, maxSize: 38, speedMult: 1.0, hardChance: 0.05, maxBurst: 2 }
       : { minGap: 300, maxGap: 450, maxSize: 45, speedMult: 1.2, hardChance: 0.15, maxBurst: 3 };
-    return p;
   }
-  // Normal game
   switch (phase) {
     case 1: return { minGap: 500, maxGap: 700, maxSize: 35, speedMult: 1.0, hardChance: 0, maxBurst: 1 };
     case 2: return { minGap: 350, maxGap: 500, maxSize: 40, speedMult: 1.2, hardChance: 0.1, maxBurst: 2 };
@@ -105,28 +103,25 @@ function getSpawnProfile(distance: number, runCount: number) {
 function getObstacleSizeCap(type: Obstacle['type'], distance: number, runCount: number) {
   const jumpLimitedCap = getJumpHeight() * 0.6;
   const profile = getSpawnProfile(distance, runCount);
-  const typeCap = type === 'triangle' ? Math.min(45, profile.maxSize) : type === 'circle' ? Math.min(40, profile.maxSize) : Math.min(40, profile.maxSize);
+  const typeCap = type === 'triangle' ? Math.min(45, profile.maxSize) : Math.min(40, profile.maxSize);
   return Math.min(typeCap, jumpLimitedCap);
 }
 
 function chooseObstacleType(distance: number, mustBeEasy: boolean, runCount: number): Obstacle['type'] {
   const phase = getPhase(distance);
-  // Run 1: only triangles and diamonds
   if (runCount <= 1) return randomFrom(['triangle', 'diamond']);
-  // Run 2: add spike_row and bouncing_ball
   if (runCount === 2) {
     if (mustBeEasy || phase === 1) return randomFrom(['triangle', 'diamond']);
     return randomFrom(['triangle', 'diamond', 'spike_row', 'bouncing_ball']);
   }
-  // Run 3: all except pendulum
   if (runCount === 3) {
     if (mustBeEasy || phase === 1) return randomFrom(['triangle', 'diamond']);
     const types: Obstacle['type'][] = ['triangle', 'circle', 'diamond', 'spike', 'star', 'spike_row', 'bouncing_ball', 'expanding', 'intermittent'];
     if (distance >= 300) types.push('gap');
+    if (distance >= 400) types.push('wall_gap');
     if (distance >= 500) types.push('ceiling_spikes');
     return randomFrom(types);
   }
-  // Run 4+: full game
   if (mustBeEasy || phase === 1) return randomFrom(['triangle', 'diamond']);
   if (phase === 2) {
     const types: Obstacle['type'][] = ['triangle', 'diamond', 'circle', 'star', 'expanding', 'intermittent'];
@@ -135,13 +130,13 @@ function chooseObstacleType(distance: number, mustBeEasy: boolean, runCount: num
   }
   const types: Obstacle['type'][] = ['triangle', 'circle', 'diamond', 'spike', 'star', 'spike_row', 'bouncing_ball', 'expanding', 'intermittent'];
   if (distance >= 300) types.push('gap');
-  if (distance >= 400) types.push('pendulum');
+  if (distance >= 400) { types.push('pendulum'); types.push('wall_gap'); }
   if (distance >= 500) types.push('ceiling_spikes');
   return randomFrom(types);
 }
 
 function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: boolean, runCount: number) {
-  if (type === 'spike_row' || type === 'bouncing_ball' || type === 'pendulum' || type === 'gap' || type === 'ceiling_spikes' || type === 'expanding' || type === 'intermittent') return 30;
+  if (type === 'spike_row' || type === 'bouncing_ball' || type === 'pendulum' || type === 'gap' || type === 'ceiling_spikes' || type === 'expanding' || type === 'intermittent' || type === 'wall_gap' || type === 'meteor') return 30;
   const cap = getObstacleSizeCap(type, distance, runCount);
   const phase = getPhase(distance);
   let minSize = type === 'triangle' || type === 'spike' ? 24 : 22;
@@ -154,7 +149,7 @@ function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: b
 }
 
 function isHardObstacle(obstacle: Obstacle) {
-  return (obstacle.type === 'circle' || obstacle.type === 'star' || obstacle.type === 'spike_row' || obstacle.type === 'bouncing_ball') && obstacle.size >= 30;
+  return (obstacle.type === 'circle' || obstacle.type === 'star' || obstacle.type === 'spike_row' || obstacle.type === 'bouncing_ball' || obstacle.type === 'wall_gap') && obstacle.size >= 30;
 }
 
 function createObstacle(canvasW: number, lineY: number, isTop: boolean, distance: number, mustBeEasy: boolean, canvasH: number, runCount: number): Obstacle {
@@ -168,6 +163,10 @@ function createObstacle(canvasW: number, lineY: number, isTop: boolean, distance
   if (type === 'ceiling_spikes') return { x: spawnX, y: 30, type, size: 35, isTop: true };
   if (type === 'expanding') { const baseS = 12; const maxS = 28 + Math.random() * 16; return { x: spawnX, y: lineY - baseS / 2, type, size: baseS, isTop: true, expandPhase: 0, expandBaseSize: baseS, expandMaxSize: maxS }; }
   if (type === 'intermittent') return { x: spawnX, y: lineY - size / 2, type, size: 26, isTop: true, intermittentPhase: 0, intermittentVisible: true };
+  if (type === 'wall_gap') {
+    const gapPos = Math.random() > 0.5 ? 'top' : 'bottom';
+    return { x: spawnX, y: lineY, type, size: 30, isTop: true, wallGapPosition: gapPos, wallWidth: 20 };
+  }
   const y = isTop ? lineY - size / 2 : lineY + size / 2;
   return { x: spawnX, y, type, size, isTop };
 }
@@ -230,22 +229,20 @@ export function createInitialState(): GameState {
     tauntText: '', tauntTimer: 0, shownTaunts: new Set(), newRecordShown: false,
     ...defaultExtraState(),
     runCount,
+    ghostMode: false,
     ghostFrames: [],
     bestGhostFrames: loadBestGhost(),
     ghostIndex: 0,
-    adrenaline: 0,
-    adrenalineActive: false,
-    adrenalineTimer: 0,
-    lastDodgeTime: 0,
-    cinematicSlowMo: 0,
-    cinematicTriggered: false,
-    multiverseActive: false,
-    multiverseTimer: 0,
-    multiverseDuration: 0,
+    adrenaline: 0, adrenalineActive: false, adrenalineTimer: 0, lastDodgeTime: 0,
+    cinematicSlowMo: 0, cinematicTriggered: false,
+    multiverseActive: false, multiverseTimer: 0, multiverseDuration: 0,
     nextMultiverseAt: 300 + Math.random() * 200,
     multiverseOffsets: [0, 80, -60, 40],
-    multiverseTextTimer: 0,
-    multiverseMergeTimer: 0,
+    multiverseTextTimer: 0, multiverseMergeTimer: 0,
+    multiverseObstacles: [[], [], []],
+    floorWaveTimer: 0, floorWavePhase: 0, nextFloorWaveAt: 300 + Math.random() * 100,
+    meteorShowerTimer: 0, nextMeteorAt: 500 + Math.random() * 100,
+    tunnelTimer: 0, nextTunnelAt: 600 + Math.random() * 100, tunnelAmount: 0,
   };
 }
 
@@ -262,19 +259,16 @@ export function resetForNewGame(state: GameState): GameState {
     ghostFrames: [],
     bestGhostFrames: loadBestGhost(),
     ghostIndex: 0,
-    adrenaline: 0,
-    adrenalineActive: false,
-    adrenalineTimer: 0,
-    lastDodgeTime: 0,
-    cinematicSlowMo: 0,
-    cinematicTriggered: false,
-    multiverseActive: false,
-    multiverseTimer: 0,
-    multiverseDuration: 0,
+    adrenaline: 0, adrenalineActive: false, adrenalineTimer: 0, lastDodgeTime: 0,
+    cinematicSlowMo: 0, cinematicTriggered: false,
+    multiverseActive: false, multiverseTimer: 0, multiverseDuration: 0,
     nextMultiverseAt: 300 + Math.random() * 200,
     multiverseOffsets: [0, 60 + Math.random() * 60, -(60 + Math.random() * 60), 30 + Math.random() * 50],
-    multiverseTextTimer: 0,
-    multiverseMergeTimer: 0,
+    multiverseTextTimer: 0, multiverseMergeTimer: 0,
+    multiverseObstacles: [[], [], []],
+    floorWaveTimer: 0, floorWavePhase: 0, nextFloorWaveAt: 300 + Math.random() * 100,
+    meteorShowerTimer: 0, nextMeteorAt: 500 + Math.random() * 100,
+    tunnelTimer: 0, nextTunnelAt: 600 + Math.random() * 100, tunnelAmount: 0,
   };
 }
 
@@ -299,6 +293,23 @@ function checkCollision(player: Player, obs: Obstacle, lineY: number): boolean {
   if (obs.type === 'pendulum') { const bh = (obs.pendulumLength || 120) * 0.15; const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y); return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + bh / 2) * shrink; }
   if (obs.type === 'ceiling_spikes') { const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y); return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + 20) * shrink; }
   if (obs.type === 'expanding') { const s = obs.size; const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - (lineY - s / 2)); return dx < (player.size / 2 + s / 2) * shrink && dy < (player.size / 2 + s / 2) * shrink; }
+  if (obs.type === 'wall_gap') {
+    const ww = obs.wallWidth || 20;
+    const dx = Math.abs(player.x - obs.x);
+    if (dx > (player.size / 2 + ww / 2) * shrink) return false;
+    const gapH = PLAYER_SIZE * 2.5;
+    if (obs.wallGapPosition === 'bottom') {
+      // Gap is at ground level - player must stay on ground (not jumping) to survive
+      return player.isJumping; // jumping into the wall = death
+    } else {
+      // Gap is at top - player must jump to survive
+      return !player.isJumping; // staying on ground = death
+    }
+  }
+  if (obs.type === 'meteor') {
+    const dx = player.x - obs.x; const dy = player.y - obs.y;
+    return Math.sqrt(dx * dx + dy * dy) < (player.size / 2 + obs.size / 2) * shrink;
+  }
   const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y);
   return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + obs.size / 2) * shrink;
 }
@@ -315,7 +326,7 @@ function getDeathType(obsType: Obstacle['type']): DeathAnimation['type'] {
     case 'triangle': return 'triangle_split';
     case 'circle': return 'circle_bounce';
     case 'bouncing_ball': return 'ball_flatten';
-    case 'spike_row': case 'spike': case 'ceiling_spikes': case 'expanding': case 'intermittent': return 'spike_shatter';
+    case 'spike_row': case 'spike': case 'ceiling_spikes': case 'expanding': case 'intermittent': case 'wall_gap': case 'meteor': return 'spike_shatter';
     case 'gap': return 'gap_fall';
     default: return 'default';
   }
@@ -350,6 +361,7 @@ export function resetSpawners() {
   frameCount = 0; forceEasyFollowUp = false; nextPhase2ObstacleOnTop = true; isFirstObstacle = true;
   lastMilestone = 0; milestoneFlashTimer = 0; milestoneFlashScore = 0; patternCount = 0; patternGapPending = false;
   passedObstacleIds.clear(); obstacleIdCounter = 0; prevStreakMult = 1;
+  mvObstacleCounters = [0, 0, 0]; mvLastSpawnX = [0, 0, 0];
 }
 
 function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: number, obsType: Obstacle['type']) {
@@ -365,7 +377,6 @@ function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: num
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
     localStorage.setItem('bestScore', String(state.bestScore));
-    // Save ghost of this best run
     saveBestGhost(state.ghostFrames);
   }
   localStorage.setItem('coins', String(state.totalCoins));
@@ -386,7 +397,13 @@ export function activateAdrenaline(state: GameState): GameState {
 export function update(state: GameState, canvasW: number, canvasH: number, dt: number): GameState {
   if (state.screen !== 'playing') return state;
 
-  const lineY = (canvasH - BANNER_HEIGHT) / 2;
+  const baseLineY = (canvasH - BANNER_HEIGHT) / 2;
+  // Floor wave modifies lineY
+  let lineY = baseLineY;
+  if (state.floorWaveTimer > 0) {
+    lineY = baseLineY + Math.sin(state.floorWavePhase) * 30;
+  }
+
   frameCount++;
   state.audioEvents = [];
   const runCount = state.runCount;
@@ -398,9 +415,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   let effectiveSpeed = state.speed;
   const slowmo = state.activePowers.find(p => p.type === 'slowmo');
   if (slowmo) effectiveSpeed *= 0.5;
-  // Adrenaline slow-mo
   if (state.adrenalineActive) effectiveSpeed *= 0.5;
-  // Cinematic slow-mo
   if (state.cinematicSlowMo > 0) effectiveSpeed *= 0.5;
 
   state.activePowers = state.activePowers.map(p => ({ ...p, remaining: p.remaining - dt })).filter(p => p.remaining > 0);
@@ -412,21 +427,13 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     state.adrenalineTimer = Math.max(0, state.adrenalineTimer - dt);
     if (state.adrenalineTimer <= 0) state.adrenalineActive = false;
   }
-
-  // Adrenaline drain if no dodges for 3 seconds
   if (!state.adrenalineActive && state.adrenaline > 0) {
     const timeSinceDodge = Date.now() - state.lastDodgeTime;
-    if (timeSinceDodge > 3000) {
-      state.adrenaline = Math.max(0, state.adrenaline - dt * 0.01);
-    }
+    if (timeSinceDodge > 3000) state.adrenaline = Math.max(0, state.adrenaline - dt * 0.01);
   }
 
-  // Cinematic slow-mo for new record
-  if (state.cinematicSlowMo > 0) {
-    state.cinematicSlowMo = Math.max(0, state.cinematicSlowMo - dt);
-  }
-
-  // Cinematic trigger on new best
+  // Cinematic slow-mo
+  if (state.cinematicSlowMo > 0) state.cinematicSlowMo = Math.max(0, state.cinematicSlowMo - dt);
   if (state.score > state.bestScore && !state.cinematicTriggered) {
     state.cinematicTriggered = true;
     state.cinematicSlowMo = 2000;
@@ -435,29 +442,155 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     playWhoosh();
   }
 
+  // === EVENTS ===
+
+  // Floor wave event (after 300m)
+  if (state.distance >= state.nextFloorWaveAt && state.floorWaveTimer <= 0 && !state.multiverseActive) {
+    state.floorWaveTimer = 3000;
+    state.floorWavePhase = 0;
+  }
+  if (state.floorWaveTimer > 0) {
+    state.floorWaveTimer -= dt;
+    state.floorWavePhase += dt * 0.005;
+    if (state.floorWaveTimer <= 0) {
+      state.floorWaveTimer = 0;
+      state.nextFloorWaveAt = state.distance + 200 + Math.random() * 200;
+    }
+  }
+
+  // Meteor shower (after 500m)
+  if (state.distance >= state.nextMeteorAt && state.meteorShowerTimer <= 0 && !state.multiverseActive) {
+    state.meteorShowerTimer = 3000;
+  }
+  if (state.meteorShowerTimer > 0) {
+    state.meteorShowerTimer -= dt;
+    // Spawn falling meteors
+    if (Math.random() < 0.08) {
+      const mx = Math.random() * canvasW;
+      state.obstacles.push({ x: mx, y: -20, type: 'meteor', size: 12 + Math.random() * 10, isTop: true, meteorVy: 3 + Math.random() * 3 });
+    }
+    if (state.meteorShowerTimer <= 0) {
+      state.meteorShowerTimer = 0;
+      state.nextMeteorAt = state.distance + 300 + Math.random() * 200;
+    }
+  }
+
+  // Tunnel (after 600m)
+  if (state.distance >= state.nextTunnelAt && state.tunnelTimer <= 0 && !state.multiverseActive) {
+    state.tunnelTimer = 2000;
+    state.tunnelAmount = 0;
+  }
+  if (state.tunnelTimer > 0) {
+    state.tunnelTimer -= dt;
+    // Ramp up tunnel amount
+    const progress = 1 - state.tunnelTimer / 2000;
+    if (progress < 0.2) state.tunnelAmount = progress / 0.2;
+    else if (progress > 0.8) state.tunnelAmount = (1 - progress) / 0.2;
+    else state.tunnelAmount = 1;
+
+    // If player jumps during tunnel, they die (ceiling is too low)
+    if (state.tunnelAmount > 0.5 && state.playerTop.isJumping) {
+      const ceilingY = lineY - PLAYER_SIZE * 1.5 * (1 - state.tunnelAmount * 0.6);
+      if (state.playerTop.y < ceilingY) {
+        const skinColor = SKIN_COLORS[state.equippedSkin] || '#00ffcc';
+        handleDeath(state, state.playerTop, skinColor, lineY, 'ceiling_spikes');
+        return state;
+      }
+    }
+
+    if (state.tunnelTimer <= 0) {
+      state.tunnelTimer = 0;
+      state.tunnelAmount = 0;
+      state.nextTunnelAt = state.distance + 300 + Math.random() * 200;
+    }
+  }
+
   // Multiverse mode
   if (state.distance >= state.nextMultiverseAt && !state.multiverseActive && state.multiverseMergeTimer <= 0) {
     state.multiverseActive = true;
     state.multiverseDuration = 10000 + Math.random() * 10000;
     state.multiverseTimer = state.multiverseDuration;
     state.multiverseOffsets = [0, 60 + Math.random() * 80, -(50 + Math.random() * 70), 30 + Math.random() * 60];
-    state.multiverseTextTimer = 1000; // 1 second intro text
+    state.multiverseTextTimer = 1000;
+    // Initialize independent obstacles for each quadrant
+    state.multiverseObstacles = [[], [], []];
+    mvObstacleCounters = [0, 0, 0];
+    mvLastSpawnX = [canvasW, canvasW, canvasW];
     playMultiverseActivate();
   }
-  if (state.multiverseTextTimer > 0) {
-    state.multiverseTextTimer = Math.max(0, state.multiverseTextTimer - dt);
-  }
+  if (state.multiverseTextTimer > 0) state.multiverseTextTimer = Math.max(0, state.multiverseTextTimer - dt);
   if (state.multiverseActive) {
     state.multiverseTimer -= dt;
+
+    // Spawn independent obstacles for each multiverse quadrant
+    for (let qi = 0; qi < 3; qi++) {
+      const qObs = state.multiverseObstacles[qi];
+      const visCount = qObs.filter(o => o.x > -60 && o.x < canvasW + 60).length;
+      if (visCount < MAX_VISIBLE_OBSTACLES) {
+        const minGap = spawnProfile.minGap;
+        const rightmost = qObs.length > 0 ? Math.max(...qObs.map(o => o.x + o.size / 2)) : 0;
+        const spawnX = canvasW + OBSTACLE_SPAWN_X_OFFSET;
+        if (qObs.length === 0 || rightmost <= spawnX - minGap) {
+          const obs = createObstacle(canvasW, baseLineY, true, state.distance, false, canvasH, runCount);
+          (obs as any)._id = 10000 + qi * 1000 + mvObstacleCounters[qi]++;
+          qObs.push(obs);
+        }
+      }
+      // Move multiverse obstacles
+      for (const obs of qObs) {
+        if (obs.type === 'bouncing_ball' && obs.bouncePhase !== undefined && obs.baseY !== undefined) {
+          obs.bouncePhase += (obs.bounceSpeed || 0.004) * dt;
+          obs.y = obs.baseY - Math.abs(Math.sin(obs.bouncePhase)) * canvasH * 0.5;
+        }
+        if (obs.type === 'pendulum' && obs.swingPhase !== undefined && obs.anchorX !== undefined) {
+          obs.swingPhase += (obs.swingSpeed || 0.003) * dt;
+          const a = Math.sin(obs.swingPhase) * 0.6;
+          const pLen = obs.pendulumLength || 120;
+          obs.x = obs.anchorX + Math.sin(a) * pLen;
+          obs.y = Math.cos(a) * pLen;
+          obs.anchorX -= effectiveSpeed;
+        } else {
+          obs.x -= effectiveSpeed;
+        }
+        if (obs.type === 'expanding' && obs.expandBaseSize !== undefined && obs.expandMaxSize !== undefined) {
+          obs.expandPhase = (obs.expandPhase || 0) + dt * 0.002;
+          const t = (Math.sin(obs.expandPhase) + 1) / 2;
+          obs.size = obs.expandBaseSize + t * (obs.expandMaxSize - obs.expandBaseSize);
+          obs.y = baseLineY - obs.size / 2;
+        }
+        if (obs.type === 'intermittent') {
+          obs.intermittentPhase = (obs.intermittentPhase || 0) + dt;
+          if (obs.intermittentPhase >= 800) { obs.intermittentPhase = 0; obs.intermittentVisible = !obs.intermittentVisible; }
+        }
+      }
+      state.multiverseObstacles[qi] = qObs.filter(o => o.x > -120);
+
+      // Check collisions for multiverse quadrant obstacles
+      for (const obs of state.multiverseObstacles[qi]) {
+        const pt = state.playerTop;
+        if (checkCollision(pt, obs, baseLineY)) {
+          if (state.hasShield) {
+            state.hasShield = false;
+            state.multiverseObstacles[qi] = state.multiverseObstacles[qi].filter(o => o !== obs);
+            addParticles(state.particles, pt.x, pt.y, '#00ffcc', 15);
+          } else {
+            const skinColor = SKIN_COLORS[state.equippedSkin] || '#00ffcc';
+            handleDeath(state, pt, skinColor, baseLineY, obs.type);
+            return state;
+          }
+          break;
+        }
+      }
+    }
+
     if (state.multiverseTimer <= 0) {
       state.multiverseActive = false;
-      state.multiverseMergeTimer = 500; // merge-back animation
+      state.multiverseMergeTimer = 500;
       state.nextMultiverseAt = state.distance + 300 + Math.random() * 300;
+      state.multiverseObstacles = [[], [], []];
     }
   }
-  if (state.multiverseMergeTimer > 0) {
-    state.multiverseMergeTimer = Math.max(0, state.multiverseMergeTimer - dt);
-  }
+  if (state.multiverseMergeTimer > 0) state.multiverseMergeTimer = Math.max(0, state.multiverseMergeTimer - dt);
 
   // Record ghost frame
   if (frameCount % 3 === 0) {
@@ -467,10 +600,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   // Color shift every 200m
   const colorIdx = Math.floor(state.distance / 200) % COLOR_THEMES.length;
   if (colorIdx !== state.colorShiftIndex) {
-    if (state.lastColorShiftAt !== colorIdx) {
-      state.lastColorShiftAt = colorIdx;
-      state.colorShiftTransition = 0;
-    }
+    if (state.lastColorShiftAt !== colorIdx) { state.lastColorShiftAt = colorIdx; state.colorShiftTransition = 0; }
     state.colorShiftIndex = colorIdx;
   }
   if (state.colorShiftTransition < 1) state.colorShiftTransition = Math.min(1, state.colorShiftTransition + dt / 2000);
@@ -487,7 +617,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if (state.disruptionTimer <= 0) state.disruptionType = 0;
   }
 
-  // Taunts (skip if cinematic is active — it has its own text)
+  // Taunts
   if (state.cinematicSlowMo <= 0) {
     for (const [dist, msg] of Object.entries(TAUNT_MESSAGES)) {
       const d = parseInt(dist);
@@ -529,6 +659,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if (frameCount % 3 === 0) addTrailParticle(state.particles, pb, skinColor);
   }
 
+  // Update obstacles
   for (const obs of state.obstacles) {
     if (obs.type === 'bouncing_ball' && obs.bouncePhase !== undefined && obs.baseY !== undefined) { obs.bouncePhase += (obs.bounceSpeed || 0.004) * dt; obs.y = obs.baseY - Math.abs(Math.sin(obs.bouncePhase)) * canvasH * 0.5; }
     if (obs.type === 'pendulum' && obs.swingPhase !== undefined && obs.anchorX !== undefined) { obs.swingPhase += (obs.swingSpeed || 0.003) * dt; const a = Math.sin(obs.swingPhase) * 0.6; const pLen = obs.pendulumLength || 120; obs.x = obs.anchorX + Math.sin(a) * pLen; obs.y = Math.cos(a) * pLen; }
@@ -542,23 +673,27 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
       obs.intermittentPhase = (obs.intermittentPhase || 0) + dt;
       if (obs.intermittentPhase >= 800) { obs.intermittentPhase = 0; obs.intermittentVisible = !obs.intermittentVisible; }
     }
+    if (obs.type === 'meteor' && obs.meteorVy) {
+      obs.y += obs.meteorVy;
+    }
   }
 
-  // Spawning — completely independent from visual effects
-  const visibleCount = state.obstacles.filter(o => o.x + o.size / 2 >= 0 && o.x - o.size / 2 <= canvasW).length;
+  // Spawning
+  const visibleCount = state.obstacles.filter(o => o.x + o.size / 2 >= 0 && o.x - o.size / 2 <= canvasW && o.type !== 'meteor').length;
   if (visibleCount < MAX_VISIBLE_OBSTACLES) {
     const mustBeEasy = forceEasyFollowUp || patternGapPending;
     const spawnOnTop = state.phase === 1 ? true : nextPhase2ObstacleOnTop;
     let candidate: Obstacle;
-    if (isFirstObstacle) candidate = { x: canvasW + OBSTACLE_SPAWN_X_OFFSET, y: (canvasH - BANNER_HEIGHT) / 2 - 15, type: 'triangle', size: 28, isTop: true };
-    else candidate = createObstacle(canvasW, (canvasH - BANNER_HEIGHT) / 2, spawnOnTop, state.distance, mustBeEasy, canvasH, runCount);
+    if (isFirstObstacle) candidate = { x: canvasW + OBSTACLE_SPAWN_X_OFFSET, y: baseLineY - 15, type: 'triangle', size: 28, isTop: true };
+    else candidate = createObstacle(canvasW, baseLineY, spawnOnTop, state.distance, mustBeEasy, canvasH, runCount);
 
     const MIN_ABSOLUTE_GAP = 350 - Math.min(150, state.distance * 0.15);
     let requiredGapPx = patternGapPending ? spawnProfile.maxGap * 1.3 : randomBetween(spawnProfile.minGap, spawnProfile.maxGap);
     requiredGapPx = Math.max(requiredGapPx, MIN_ABSOLUTE_GAP);
     if (isFirstObstacle) requiredGapPx = Math.max(requiredGapPx, SAFE_SPAWN_ZONE);
-    const rightmost = state.obstacles.length > 0 ? Math.max(...state.obstacles.map(o => o.x + o.size / 2)) : state.playerTop.x - SAFE_SPAWN_ZONE;
-    if (state.obstacles.length === 0 || rightmost <= candidate.x - candidate.size / 2 - requiredGapPx) {
+    const nonMeteors = state.obstacles.filter(o => o.type !== 'meteor');
+    const rightmost = nonMeteors.length > 0 ? Math.max(...nonMeteors.map(o => o.x + o.size / 2)) : state.playerTop.x - SAFE_SPAWN_ZONE;
+    if (nonMeteors.length === 0 || rightmost <= candidate.x - candidate.size / 2 - requiredGapPx) {
       (candidate as any)._id = obstacleIdCounter++;
       state.obstacles.push(candidate);
       isFirstObstacle = false;
@@ -574,8 +709,9 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
 
   state.obstacles = state.obstacles.map(o => {
     if (o.type === 'pendulum' && o.anchorX !== undefined) { o.anchorX -= effectiveSpeed; return o; }
+    if (o.type === 'meteor') return o; // Meteors move vertically only
     return { ...o, x: o.x - effectiveSpeed };
-  }).filter(o => o.x > -120);
+  }).filter(o => o.x > -120 && (o.type !== 'meteor' || o.y < canvasH + 50));
 
   const magnet = state.activePowers.find(p => p.type === 'magnet');
   state.coinItems = state.coinItems.map(c => {
@@ -591,10 +727,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
       passedObstacleIds.add(oid);
       state.streak++;
       state.lastDodgeTime = Date.now();
-      // Adrenaline fill (not during adrenaline active)
-      if (!state.adrenalineActive) {
-        state.adrenaline = Math.min(100, state.adrenaline + 15);
-      }
+      if (!state.adrenalineActive) state.adrenaline = Math.min(100, state.adrenaline + 15);
       if (state.streak >= 30) state.streakMultiplier = 4;
       else if (state.streak >= 20) state.streakMultiplier = 3;
       else if (state.streak >= 10) state.streakMultiplier = 2;
@@ -603,7 +736,6 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
-  // Multiverse x2 score multiplier
   const mvMult = state.multiverseActive ? 2 : 1;
 
   for (const coin of state.coinItems) {
@@ -620,8 +752,9 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
+  // Collision check for main obstacles
   for (const obs of state.obstacles) {
-    if (obs.type === 'gap' || obs.type === 'ceiling_spikes' || obs.type === 'bouncing_ball' || obs.type === 'pendulum' || obs.type === 'expanding' || obs.type === 'intermittent') {
+    if (obs.type === 'gap' || obs.type === 'ceiling_spikes' || obs.type === 'bouncing_ball' || obs.type === 'pendulum' || obs.type === 'expanding' || obs.type === 'intermittent' || obs.type === 'wall_gap' || obs.type === 'meteor') {
       for (const p of [pt, state.playerBottom].filter(Boolean) as Player[]) {
         if (checkCollision(p, obs, lineY)) {
           if (state.hasShield) { state.hasShield = false; state.obstacles = state.obstacles.filter(o => o !== obs); addParticles(state.particles, p.x, p.y, '#00ffcc', 15); }
@@ -679,7 +812,9 @@ function getCurrentTheme(state: GameState) {
 
 export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW: number, canvasH: number) {
   const h = canvasH - BANNER_HEIGHT;
-  const lineY = h / 2;
+  const baseLineY = h / 2;
+  let lineY = baseLineY;
+  if (state.floorWaveTimer > 0) lineY = baseLineY + Math.sin(state.floorWavePhase) * 30;
   const theme = getCurrentTheme(state);
 
   let shakeX = 0, shakeY = 0;
@@ -705,6 +840,24 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1;
   for (let x = (frameCount * 2) % 60; x < canvasW; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
 
+  // Tunnel rendering
+  if (state.tunnelTimer > 0 && state.screen === 'playing') {
+    const ta = state.tunnelAmount;
+    const ceilingY = ta * (lineY - PLAYER_SIZE * 1.8);
+    const floorY = h - ta * (h - lineY - PLAYER_SIZE * 1.8);
+    ctx.save();
+    ctx.fillStyle = invertActive ? '#333' : theme.obstacle;
+    ctx.globalAlpha = 0.6;
+    ctx.fillRect(0, 0, canvasW, ceilingY);
+    ctx.fillRect(0, floorY, canvasW, h - floorY);
+    ctx.strokeStyle = theme.line;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath(); ctx.moveTo(0, ceilingY); ctx.lineTo(canvasW, ceilingY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, floorY); ctx.lineTo(canvasW, floorY); ctx.stroke();
+    ctx.restore();
+  }
+
   if (!noLine) {
     const gaps = state.obstacles.filter(o => o.type === 'gap');
     const lineColor = invertActive ? '#333' : theme.line;
@@ -728,9 +881,8 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.restore(); ctx.restore(); return;
   }
 
-  // Ghost replay
-  if (state.bestGhostFrames.length > 0 && state.screen === 'playing') {
-    // Find ghost frame closest to current distance
+  // Ghost replay — only in ghostMode
+  if (state.ghostMode && state.bestGhostFrames.length > 0 && state.screen === 'playing') {
     let gi = state.ghostIndex;
     while (gi < state.bestGhostFrames.length - 1 && state.bestGhostFrames[gi].distance < state.distance) gi++;
     state.ghostIndex = gi;
@@ -742,7 +894,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
       ctx.shadowColor = '#ffffff';
       ctx.shadowBlur = 8;
       ctx.fillRect(80 - PLAYER_SIZE / 2, gf.y - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
-      // Label
       ctx.globalAlpha = 0.5;
       ctx.font = '9px monospace';
       ctx.fillStyle = '#ffffff';
@@ -754,17 +905,12 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
 
   const drawPlayer = (p: Player) => {
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation); ctx.scale(p.squashX, p.squashY);
-    if (state.adrenalineActive) {
-      ctx.shadowColor = skinColor; ctx.shadowBlur = 40;
-    } else if (state.streak >= 30) {
-      ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 25;
-    } else {
-      ctx.shadowColor = skinColor; ctx.shadowBlur = 15;
-    }
+    if (state.adrenalineActive) { ctx.shadowColor = skinColor; ctx.shadowBlur = 40; }
+    else if (state.streak >= 30) { ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 25; }
+    else { ctx.shadowColor = skinColor; ctx.shadowBlur = 15; }
     ctx.fillStyle = state.adrenalineActive ? skinColor : (state.streak >= 30 ? '#ffd700' : skinColor);
     ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
     if (state.adrenalineActive) {
-      // Intense glow overlay
       ctx.globalAlpha = 0.3 + 0.2 * Math.sin(Date.now() * 0.01);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
@@ -781,7 +927,7 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   for (const obs of state.obstacles) {
     if (obs.type === 'intermittent' && !obs.intermittentVisible) { ctx.save(); ctx.globalAlpha = 0.15; ctx.strokeStyle = obsColor; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(obs.x, obs.y, obs.size / 2, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); continue; }
     ctx.save();
-    if (obs.type !== 'gap' && obs.type !== 'ceiling_spikes' && obs.type !== 'pendulum') {
+    if (obs.type !== 'gap' && obs.type !== 'ceiling_spikes' && obs.type !== 'pendulum' && obs.type !== 'wall_gap' && obs.type !== 'meteor') {
       ctx.save(); ctx.globalAlpha = invisibleObs ? 0.35 : 0.25; ctx.fillStyle = invisibleObs ? 'rgba(0,0,0,0.6)' : obsColor;
       ctx.beginPath(); ctx.ellipse(obs.x, lineY, obs.size / 2 + 4, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     }
@@ -802,6 +948,51 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
       case 'ceiling_spikes': { ctx.fillStyle = obsColor; const cc = 5; const csw = 14; const csh = 35; const csx = obs.x - (cc * csw) / 2; for (let i = 0; i < cc; i++) { const x = csx + i * csw + csw / 2; ctx.beginPath(); ctx.moveTo(x - csw / 2, 0); ctx.lineTo(x, csh); ctx.lineTo(x + csw / 2, 0); ctx.closePath(); ctx.fill(); } break; }
       case 'expanding': { ctx.fillStyle = obsColor; ctx.fillRect(obs.x - obs.size / 2, lineY - obs.size, obs.size, obs.size); break; }
       case 'intermittent': { ctx.fillStyle = obsColor; ctx.fillRect(obs.x - obs.size / 2, obs.y - obs.size / 2, obs.size, obs.size); break; }
+      case 'wall_gap': {
+        const ww = obs.wallWidth || 20;
+        const gapH = PLAYER_SIZE * 2.5;
+        ctx.fillStyle = obsColor;
+        if (obs.wallGapPosition === 'bottom') {
+          // Wall on top, gap at bottom (ground level)
+          ctx.fillRect(obs.x - ww / 2, 0, ww, lineY - gapH);
+        } else {
+          // Wall on bottom, gap at top
+          ctx.fillRect(obs.x - ww / 2, lineY - gapH + PLAYER_SIZE * 2, ww, h - lineY + gapH);
+        }
+        // Gap indicator
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.strokeStyle = theme.line;
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        if (obs.wallGapPosition === 'bottom') {
+          ctx.strokeRect(obs.x - ww / 2, lineY - gapH, ww, gapH);
+        } else {
+          ctx.strokeRect(obs.x - ww / 2, lineY - gapH - PLAYER_SIZE, ww, gapH);
+        }
+        ctx.setLineDash([]);
+        ctx.restore();
+        break;
+      }
+      case 'meteor': {
+        ctx.fillStyle = '#ff4444';
+        ctx.shadowColor = '#ff4444';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(obs.x, obs.y, obs.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Tail
+        ctx.save();
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath();
+        ctx.moveTo(obs.x - obs.size / 3, obs.y - obs.size / 2);
+        ctx.lineTo(obs.x, obs.y - obs.size * 1.5);
+        ctx.lineTo(obs.x + obs.size / 3, obs.y - obs.size / 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        break;
+      }
     }
     ctx.restore();
   }
@@ -815,102 +1006,68 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     const mergeProgress = mvMerging ? 1 - state.multiverseMergeTimer / 500 : 0;
     const splitAlpha = mvActive ? Math.min(fadeIn, fadeOut) : (1 - mergeProgress);
 
-    const QUAD_TINTS = [
-      'rgba(0,255,204,0.06)',   // top-left cyan
-      'rgba(168,85,247,0.06)',  // top-right purple
-      'rgba(251,146,60,0.06)', // bottom-left orange
-      'rgba(239,68,68,0.06)',  // bottom-right red
-    ];
+    const QUAD_TINTS = ['rgba(0,255,204,0.06)', 'rgba(168,85,247,0.06)', 'rgba(251,146,60,0.06)', 'rgba(239,68,68,0.06)'];
     const QUAD_NEON = ['#00ffcc', '#a855f7', '#fb923c', '#ef4444'];
 
-    // Scale factor for merge animation (1 = split, 0 = merged)
     const scale = mvMerging ? (1 - mergeProgress) : splitAlpha;
-
     ctx.save();
-    // Draw quadrant tinted backgrounds
     const qw = canvasW / 2;
     const qh = h / 2;
-    const quadrantDefs = [
-      { ox: 0, oy: 0 },        // top-left
-      { ox: qw, oy: 0 },       // top-right
-      { ox: 0, oy: qh },       // bottom-left
-      { ox: qw, oy: qh },      // bottom-right
-    ];
+    const quadrantDefs = [{ ox: 0, oy: 0 }, { ox: qw, oy: 0 }, { ox: 0, oy: qh }, { ox: qw, oy: qh }];
+
     for (let qi = 0; qi < 4; qi++) {
       const qd = quadrantDefs[qi];
-      ctx.save();
-      ctx.globalAlpha = scale;
-      ctx.fillStyle = QUAD_TINTS[qi];
-      ctx.fillRect(qd.ox, qd.oy, qw, qh);
-      ctx.restore();
+      ctx.save(); ctx.globalAlpha = scale; ctx.fillStyle = QUAD_TINTS[qi]; ctx.fillRect(qd.ox, qd.oy, qw, qh); ctx.restore();
     }
 
-    // Draw mini game views in each quadrant (scaled obstacles + player)
+    // Draw mini game views — quadrant 0 uses main obstacles, 1-3 use independent arrays
     for (let qi = 0; qi < 4; qi++) {
       const qd = quadrantDefs[qi];
-      const offset = state.multiverseOffsets[qi] || 0;
+      const qObs = qi === 0 ? state.obstacles : (state.multiverseObstacles[qi - 1] || []);
       ctx.save();
       ctx.globalAlpha = scale * 0.85;
-      // Clip to quadrant
-      ctx.beginPath();
-      ctx.rect(qd.ox, qd.oy, qw, qh);
-      ctx.clip();
-      // Scale to fit quadrant
+      ctx.beginPath(); ctx.rect(qd.ox, qd.oy, qw, qh); ctx.clip();
       ctx.translate(qd.ox, qd.oy);
       ctx.scale(0.5, 0.5);
-      // Draw line
-      ctx.strokeStyle = QUAD_NEON[qi];
-      ctx.lineWidth = 2;
-      ctx.shadowColor = QUAD_NEON[qi];
-      ctx.shadowBlur = 10;
-      ctx.beginPath(); ctx.moveTo(0, lineY); ctx.lineTo(canvasW, lineY); ctx.stroke();
+      // Line
+      ctx.strokeStyle = QUAD_NEON[qi]; ctx.lineWidth = 2; ctx.shadowColor = QUAD_NEON[qi]; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.moveTo(0, baseLineY); ctx.lineTo(canvasW, baseLineY); ctx.stroke();
       ctx.shadowBlur = 0;
-      // Draw obstacles with offset
-      for (const obs of state.obstacles) {
-        const ox = obs.x + offset;
-        if (ox < -60 || ox > canvasW + 60) continue;
+      // Obstacles
+      for (const obs of qObs) {
         if (obs.type === 'intermittent' && !obs.intermittentVisible) continue;
-        ctx.fillStyle = QUAD_NEON[qi];
-        ctx.shadowColor = QUAD_NEON[qi];
-        ctx.shadowBlur = 6;
-        const half = obs.size / 2;
+        if (obs.type === 'meteor') continue; // Don't show meteors in miniview
+        ctx.fillStyle = QUAD_NEON[qi]; ctx.shadowColor = QUAD_NEON[qi]; ctx.shadowBlur = 6;
+        const half2 = obs.size / 2;
         switch (obs.type) {
-          case 'triangle': ctx.beginPath(); ctx.moveTo(ox, obs.y - half); ctx.lineTo(ox + half, obs.y + half); ctx.lineTo(ox - half, obs.y + half); ctx.closePath(); ctx.fill(); break;
-          case 'circle': ctx.beginPath(); ctx.arc(ox, obs.y, half, 0, Math.PI * 2); ctx.fill(); break;
-          case 'diamond': ctx.beginPath(); ctx.moveTo(ox, obs.y - half); ctx.lineTo(ox + half, obs.y); ctx.lineTo(ox, obs.y + half); ctx.lineTo(ox - half, obs.y); ctx.closePath(); ctx.fill(); break;
-          case 'spike_row': { const c = obs.spikeCount || 3; const sw = 14; for (let i = 0; i < c; i++) { const sx = ox - (c * sw) / 2 + i * sw + sw / 2; ctx.beginPath(); ctx.moveTo(sx - sw / 2, lineY); ctx.lineTo(sx, lineY - obs.size); ctx.lineTo(sx + sw / 2, lineY); ctx.closePath(); ctx.fill(); } break; }
-          case 'bouncing_ball': ctx.beginPath(); ctx.arc(ox, obs.y, obs.size, 0, Math.PI * 2); ctx.fill(); break;
-          default: ctx.fillRect(ox - half, obs.y - half, obs.size, obs.size); break;
+          case 'triangle': ctx.beginPath(); ctx.moveTo(obs.x, obs.y - half2); ctx.lineTo(obs.x + half2, obs.y + half2); ctx.lineTo(obs.x - half2, obs.y + half2); ctx.closePath(); ctx.fill(); break;
+          case 'circle': ctx.beginPath(); ctx.arc(obs.x, obs.y, half2, 0, Math.PI * 2); ctx.fill(); break;
+          case 'diamond': ctx.beginPath(); ctx.moveTo(obs.x, obs.y - half2); ctx.lineTo(obs.x + half2, obs.y); ctx.lineTo(obs.x, obs.y + half2); ctx.lineTo(obs.x - half2, obs.y); ctx.closePath(); ctx.fill(); break;
+          case 'spike_row': { const c = obs.spikeCount || 3; const sw = 14; for (let i = 0; i < c; i++) { const sx = obs.x - (c * sw) / 2 + i * sw + sw / 2; ctx.beginPath(); ctx.moveTo(sx - sw / 2, baseLineY); ctx.lineTo(sx, baseLineY - obs.size); ctx.lineTo(sx + sw / 2, baseLineY); ctx.closePath(); ctx.fill(); } break; }
+          case 'bouncing_ball': ctx.beginPath(); ctx.arc(obs.x, obs.y, obs.size, 0, Math.PI * 2); ctx.fill(); break;
+          case 'wall_gap': { const ww2 = obs.wallWidth || 20; ctx.fillRect(obs.x - ww2 / 2, 0, ww2, baseLineY * 0.7); break; }
+          default: ctx.fillRect(obs.x - half2, obs.y - half2, obs.size, obs.size); break;
         }
         ctx.shadowBlur = 0;
       }
-      // Draw player
-      ctx.fillStyle = skinColor;
-      ctx.shadowColor = skinColor;
-      ctx.shadowBlur = 12;
-      const pt = state.playerTop;
-      ctx.fillRect(pt.x - pt.size / 2, pt.y - pt.size / 2, pt.size, pt.size);
+      // Player
+      ctx.fillStyle = skinColor; ctx.shadowColor = skinColor; ctx.shadowBlur = 12;
+      const ptRef = state.playerTop;
+      ctx.fillRect(ptRef.x - ptRef.size / 2, ptRef.y - ptRef.size / 2, ptRef.size, ptRef.size);
       ctx.shadowBlur = 0;
       ctx.restore();
     }
 
     // Neon dividing lines
     ctx.globalAlpha = scale;
-    ctx.strokeStyle = '#00ffcc';
-    ctx.shadowColor = '#00ffcc';
-    ctx.shadowBlur = 15;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#00ffcc'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 15; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(canvasW / 2, 0); ctx.lineTo(canvasW / 2, h); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(canvasW, h / 2); ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // x2 indicator
     ctx.globalAlpha = scale;
-    ctx.fillStyle = '#ffd700';
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur = 10;
-    ctx.font = 'bold 14px monospace';
-    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 10;
+    ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
     ctx.fillText('SCORE x2', canvasW / 2, h - 12);
     ctx.shadowBlur = 0;
     ctx.restore();
@@ -921,19 +1078,43 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     const textAlpha = state.multiverseTextTimer > 700 ? (1000 - state.multiverseTextTimer) / 300 : state.multiverseTextTimer / 700;
     ctx.save();
     ctx.globalAlpha = Math.max(0, textAlpha);
-    ctx.fillStyle = '#00ffcc';
-    ctx.shadowColor = '#00ffcc';
-    ctx.shadowBlur = 40;
-    ctx.font = 'bold 42px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#00ffcc'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 40;
+    ctx.font = 'bold 42px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('MULTIVERSE', canvasW / 2, h / 2);
-    // Flash effect at start
     if (state.multiverseTextTimer > 900) {
       ctx.globalAlpha = (state.multiverseTextTimer - 900) / 100;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvasW, h);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvasW, h);
     }
+    ctx.restore();
+  }
+
+  // Meteor shower warning
+  if (state.meteorShowerTimer > 2500 && state.screen === 'playing') {
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = '#ff4444';
+    ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('⚠ METEOR SHOWER ⚠', canvasW / 2, 50);
+    ctx.restore();
+  }
+
+  // Floor wave indicator
+  if (state.floorWaveTimer > 0 && state.screen === 'playing') {
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = theme.line;
+    ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('~ FLOOR WAVE ~', canvasW / 2, 50);
+    ctx.restore();
+  }
+
+  // Tunnel warning
+  if (state.tunnelTimer > 0 && state.screen === 'playing') {
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#ff6600';
+    ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('🚧 TUNNEL — DON\'T JUMP 🚧', canvasW / 2, 50);
     ctx.restore();
   }
 
@@ -983,7 +1164,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.fillText(`${milestoneFlashScore}m`, canvasW / 2, h / 2 - 80); ctx.restore();
   }
 
-  // Taunt / cinematic new record
   if (state.tauntTimer > 0 && state.tauntText && state.screen === 'playing') {
     ctx.save();
     const elapsed = (state.tauntText === 'NEW RECORD' ? 2.0 : 1.5) - state.tauntTimer;
@@ -998,15 +1178,13 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.restore();
   }
 
-  // Cinematic golden vignette
   if (state.cinematicSlowMo > 0 && state.screen === 'playing') {
     const vigAlpha = Math.min(0.4, (2000 - state.cinematicSlowMo) / 1000) * Math.min(1, state.cinematicSlowMo / 500);
     ctx.save();
     const gradient = ctx.createRadialGradient(canvasW / 2, h / 2, h * 0.3, canvasW / 2, h / 2, h * 0.8);
     gradient.addColorStop(0, 'rgba(255,215,0,0)');
     gradient.addColorStop(1, `rgba(255,215,0,${vigAlpha})`);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvasW, h);
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, canvasW, h);
     ctx.restore();
   }
 
@@ -1022,7 +1200,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = '#ff0000'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
     ctx.fillText('⚠ DISRUPTION ⚠', canvasW / 2, 20); ctx.restore();
   }
-
 
   ctx.restore();
 
@@ -1043,7 +1220,6 @@ export function handleInput(state: GameState): GameState {
   const pt = state.playerTop;
   if (!pt.isJumping) { pt.anticipation = 1; pt.vy = JUMP_FORCE; pt.isJumping = true; } else { pt.vy = Math.abs(JUMP_FORCE); }
   if (state.playerBottom) { const pb = state.playerBottom; if (!pb.isJumping) { pb.anticipation = 1; pb.vy = -JUMP_FORCE; pb.isJumping = true; } else { pb.vy = -Math.abs(JUMP_FORCE); } }
-  // Record jump for ghost
   state.ghostFrames.push({ distance: state.distance, y: pt.y, isJumping: true });
   return state;
 }

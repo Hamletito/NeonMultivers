@@ -16,7 +16,7 @@ export interface Player {
 export interface Obstacle {
   x: number;
   y: number;
-  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond' | 'spike_row' | 'bouncing_ball' | 'pendulum' | 'gap' | 'ceiling_spikes' | 'expanding' | 'intermittent';
+  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond' | 'spike_row' | 'bouncing_ball' | 'pendulum' | 'gap' | 'ceiling_spikes' | 'expanding' | 'intermittent' | 'wall_gap' | 'meteor';
   size: number;
   isTop: boolean;
   bouncePhase?: number;
@@ -33,6 +33,9 @@ export interface Obstacle {
   expandMaxSize?: number;
   intermittentPhase?: number;
   intermittentVisible?: boolean;
+  wallGapPosition?: 'top' | 'bottom';
+  wallWidth?: number;
+  meteorVy?: number;
 }
 
 export interface Coin {
@@ -67,7 +70,8 @@ export interface ShopItem {
   id: string;
   name: string;
   price: number;
-  type: 'skin' | 'trail' | 'death' | 'powerup';
+  type: 'skin' | 'trail' | 'death' | 'powerup' | 'jump' | 'background' | 'floor';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
   color?: string;
   owned: boolean;
   equipped?: boolean;
@@ -118,30 +122,27 @@ export interface GameState {
   tauntTimer: number;
   shownTaunts: Set<number>;
   newRecordShown: boolean;
-  // Color shift & disruption
   colorShiftIndex: number;
   colorShiftTransition: number;
   disruptionType: number;
   disruptionTimer: number;
   lastColorShiftAt: number;
   lastDisruptionAt: number;
-  // Death animation
   deathAnim: DeathAnimation | null;
-  // Audio events for this frame
   audioEvents: string[];
-  // Run count for invisible tutorial
   runCount: number;
-  // Ghost replay
+  // Ghost
+  ghostMode: boolean;
   ghostFrames: GhostFrame[];
   bestGhostFrames: GhostFrame[];
   ghostIndex: number;
   // Adrenaline
-  adrenaline: number; // 0-100
+  adrenaline: number;
   adrenalineActive: boolean;
   adrenalineTimer: number;
   lastDodgeTime: number;
-  // Cinematic new record
-  cinematicSlowMo: number; // remaining ms, 0 = inactive
+  // Cinematic
+  cinematicSlowMo: number;
   cinematicTriggered: boolean;
   // Multiverse
   multiverseActive: boolean;
@@ -149,6 +150,16 @@ export interface GameState {
   multiverseDuration: number;
   nextMultiverseAt: number;
   multiverseOffsets: number[];
-  multiverseTextTimer: number; // "MULTIVERSE" intro text
-  multiverseMergeTimer: number; // merge-back animation
+  multiverseTextTimer: number;
+  multiverseMergeTimer: number;
+  multiverseObstacles: Obstacle[][];
+  // Events
+  floorWaveTimer: number;
+  floorWavePhase: number;
+  nextFloorWaveAt: number;
+  meteorShowerTimer: number;
+  nextMeteorAt: number;
+  tunnelTimer: number;
+  nextTunnelAt: number;
+  tunnelAmount: number;
 }
