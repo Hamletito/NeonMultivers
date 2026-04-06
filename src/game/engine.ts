@@ -435,32 +435,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     playWhoosh();
   }
 
-  // Darkness mode
-  if (state.distance >= state.nextDarknessAt && !state.darknessActive && state.darknessWarning <= 0) {
-    state.darknessWarning = 1000; // 1 second warning
-    playDarknessWarning();
-  }
-  if (state.darknessWarning > 0) {
-    state.darknessWarning -= dt;
-    if (state.darknessWarning <= 0) {
-      state.darknessActive = true;
-      state.darknessDuration = 8000 + Math.random() * 7000;
-      state.darknessTimer = state.darknessDuration;
-      state.darknessFade = 0;
-    }
-  }
-  if (state.darknessActive) {
-    state.darknessFade = Math.min(1, state.darknessFade + dt / 500);
-    state.darknessTimer -= dt;
-    if (state.darknessTimer <= 0) {
-      state.darknessActive = false;
-      state.nextDarknessAt = state.distance + 200 + Math.random() * 300;
-    }
-  } else if (state.darknessFade > 0) {
-    state.darknessFade = Math.max(0, state.darknessFade - dt / 500);
-  }
-
-  // Multiverse mode (simplified visual)
+  // Multiverse mode
   if (state.distance >= state.nextMultiverseAt && !state.multiverseActive) {
     state.multiverseActive = true;
     state.multiverseDuration = 10000 + Math.random() * 10000;
