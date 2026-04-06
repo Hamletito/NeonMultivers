@@ -143,17 +143,12 @@ export interface GameState {
   // Cinematic new record
   cinematicSlowMo: number; // remaining ms, 0 = inactive
   cinematicTriggered: boolean;
-  // Darkness mode
-  darknessActive: boolean;
-  darknessTimer: number;
-  darknessDuration: number;
-  nextDarknessAt: number;
-  darknessWarning: number; // countdown before darkness
-  darknessFade: number; // 0-1 for smooth fade
   // Multiverse
   multiverseActive: boolean;
   multiverseTimer: number;
   multiverseDuration: number;
   nextMultiverseAt: number;
-  multiverseOffsets: number[]; // x offsets for obstacle rendering in each quadrant
+  multiverseOffsets: number[];
+  multiverseTextTimer: number; // "MULTIVERSE" intro text
+  multiverseMergeTimer: number; // merge-back animation
 }

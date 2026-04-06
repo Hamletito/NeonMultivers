@@ -13,7 +13,7 @@ import {
   BANNER_HEIGHT,
   SKIN_COLORS,
 } from './constants';
-import { playJump, playLand, playCoin, playDeath, playStreakChime, playWhoosh, updateMusicTempo, stopMusic, playDarknessWarning, playMultiverseActivate, playAdrenalineActivate } from './audio';
+import { playJump, playLand, playCoin, playDeath, playStreakChime, playWhoosh, updateMusicTempo, stopMusic, playMultiverseActivate, playAdrenalineActivate } from './audio';
 
 const MAX_VISIBLE_OBSTACLES = 3;
 const OBSTACLE_SPAWN_X_OFFSET = 64;
@@ -239,17 +239,13 @@ export function createInitialState(): GameState {
     lastDodgeTime: 0,
     cinematicSlowMo: 0,
     cinematicTriggered: false,
-    darknessActive: false,
-    darknessTimer: 0,
-    darknessDuration: 0,
-    nextDarknessAt: 400 + Math.random() * 200,
-    darknessWarning: 0,
-    darknessFade: 0,
     multiverseActive: false,
     multiverseTimer: 0,
     multiverseDuration: 0,
     nextMultiverseAt: 300 + Math.random() * 200,
     multiverseOffsets: [0, 80, -60, 40],
+    multiverseTextTimer: 0,
+    multiverseMergeTimer: 0,
   };
 }
 
@@ -272,17 +268,13 @@ export function resetForNewGame(state: GameState): GameState {
     lastDodgeTime: 0,
     cinematicSlowMo: 0,
     cinematicTriggered: false,
-    darknessActive: false,
-    darknessTimer: 0,
-    darknessDuration: 0,
-    nextDarknessAt: 400 + Math.random() * 200,
-    darknessWarning: 0,
-    darknessFade: 0,
     multiverseActive: false,
     multiverseTimer: 0,
     multiverseDuration: 0,
     nextMultiverseAt: 300 + Math.random() * 200,
     multiverseOffsets: [0, 60 + Math.random() * 60, -(60 + Math.random() * 60), 30 + Math.random() * 50],
+    multiverseTextTimer: 0,
+    multiverseMergeTimer: 0,
   };
 }
 
@@ -443,45 +435,28 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     playWhoosh();
   }
 
-  // Darkness mode
-  if (state.distance >= state.nextDarknessAt && !state.darknessActive && state.darknessWarning <= 0) {
-    state.darknessWarning = 1000; // 1 second warning
-    playDarknessWarning();
-  }
-  if (state.darknessWarning > 0) {
-    state.darknessWarning -= dt;
-    if (state.darknessWarning <= 0) {
-      state.darknessActive = true;
-      state.darknessDuration = 8000 + Math.random() * 7000;
-      state.darknessTimer = state.darknessDuration;
-      state.darknessFade = 0;
-    }
-  }
-  if (state.darknessActive) {
-    state.darknessFade = Math.min(1, state.darknessFade + dt / 500);
-    state.darknessTimer -= dt;
-    if (state.darknessTimer <= 0) {
-      state.darknessActive = false;
-      state.nextDarknessAt = state.distance + 200 + Math.random() * 300;
-    }
-  } else if (state.darknessFade > 0) {
-    state.darknessFade = Math.max(0, state.darknessFade - dt / 500);
-  }
-
-  // Multiverse mode (simplified visual)
-  if (state.distance >= state.nextMultiverseAt && !state.multiverseActive) {
+  // Multiverse mode
+  if (state.distance >= state.nextMultiverseAt && !state.multiverseActive && state.multiverseMergeTimer <= 0) {
     state.multiverseActive = true;
     state.multiverseDuration = 10000 + Math.random() * 10000;
     state.multiverseTimer = state.multiverseDuration;
-    state.multiverseOffsets = [0, 60 + Math.random() * 60, -(60 + Math.random() * 60), 30 + Math.random() * 50];
+    state.multiverseOffsets = [0, 60 + Math.random() * 80, -(50 + Math.random() * 70), 30 + Math.random() * 60];
+    state.multiverseTextTimer = 1000; // 1 second intro text
     playMultiverseActivate();
+  }
+  if (state.multiverseTextTimer > 0) {
+    state.multiverseTextTimer = Math.max(0, state.multiverseTextTimer - dt);
   }
   if (state.multiverseActive) {
     state.multiverseTimer -= dt;
     if (state.multiverseTimer <= 0) {
       state.multiverseActive = false;
+      state.multiverseMergeTimer = 500; // merge-back animation
       state.nextMultiverseAt = state.distance + 300 + Math.random() * 300;
     }
+  }
+  if (state.multiverseMergeTimer > 0) {
+    state.multiverseMergeTimer = Math.max(0, state.multiverseMergeTimer - dt);
   }
 
   // Record ghost frame
@@ -831,44 +806,134 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.restore();
   }
 
-  // Multiverse visual overlay
-  if (state.multiverseActive && state.screen === 'playing') {
-    const fadeIn = Math.min(1, (state.multiverseDuration - state.multiverseTimer) / 500);
-    const fadeOut = Math.min(1, state.multiverseTimer / 500);
-    const alpha = Math.min(fadeIn, fadeOut) * 0.3;
-    // Draw split lines
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(canvasW / 2, 0); ctx.lineTo(canvasW / 2, h); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(canvasW, h / 2); ctx.stroke();
-    // Draw ghost players in other quadrants
-    const quadrants = [
-      { x: canvasW / 4, y: h / 4 },
-      { x: canvasW * 3 / 4, y: h / 4 },
-      { x: canvasW / 4, y: h * 3 / 4 },
+  // Multiverse rendering
+  const mvActive = state.multiverseActive && state.screen === 'playing';
+  const mvMerging = !state.multiverseActive && state.multiverseMergeTimer > 0 && state.screen === 'playing';
+  if (mvActive || mvMerging) {
+    const fadeIn = mvActive ? Math.min(1, (state.multiverseDuration - state.multiverseTimer) / 500) : 0;
+    const fadeOut = mvActive ? Math.min(1, state.multiverseTimer / 500) : 0;
+    const mergeProgress = mvMerging ? 1 - state.multiverseMergeTimer / 500 : 0;
+    const splitAlpha = mvActive ? Math.min(fadeIn, fadeOut) : (1 - mergeProgress);
+
+    const QUAD_TINTS = [
+      'rgba(0,255,204,0.06)',   // top-left cyan
+      'rgba(168,85,247,0.06)',  // top-right purple
+      'rgba(251,146,60,0.06)', // bottom-left orange
+      'rgba(239,68,68,0.06)',  // bottom-right red
     ];
-    for (let i = 0; i < 3; i++) {
-      const q = quadrants[i];
-      const offset = state.multiverseOffsets[i + 1] || 0;
-      ctx.globalAlpha = alpha * 0.7;
+    const QUAD_NEON = ['#00ffcc', '#a855f7', '#fb923c', '#ef4444'];
+
+    // Scale factor for merge animation (1 = split, 0 = merged)
+    const scale = mvMerging ? (1 - mergeProgress) : splitAlpha;
+
+    ctx.save();
+    // Draw quadrant tinted backgrounds
+    const qw = canvasW / 2;
+    const qh = h / 2;
+    const quadrantDefs = [
+      { ox: 0, oy: 0 },        // top-left
+      { ox: qw, oy: 0 },       // top-right
+      { ox: 0, oy: qh },       // bottom-left
+      { ox: qw, oy: qh },      // bottom-right
+    ];
+    for (let qi = 0; qi < 4; qi++) {
+      const qd = quadrantDefs[qi];
+      ctx.save();
+      ctx.globalAlpha = scale;
+      ctx.fillStyle = QUAD_TINTS[qi];
+      ctx.fillRect(qd.ox, qd.oy, qw, qh);
+      ctx.restore();
+    }
+
+    // Draw mini game views in each quadrant (scaled obstacles + player)
+    for (let qi = 0; qi < 4; qi++) {
+      const qd = quadrantDefs[qi];
+      const offset = state.multiverseOffsets[qi] || 0;
+      ctx.save();
+      ctx.globalAlpha = scale * 0.85;
+      // Clip to quadrant
+      ctx.beginPath();
+      ctx.rect(qd.ox, qd.oy, qw, qh);
+      ctx.clip();
+      // Scale to fit quadrant
+      ctx.translate(qd.ox, qd.oy);
+      ctx.scale(0.5, 0.5);
+      // Draw line
+      ctx.strokeStyle = QUAD_NEON[qi];
+      ctx.lineWidth = 2;
+      ctx.shadowColor = QUAD_NEON[qi];
+      ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.moveTo(0, lineY); ctx.lineTo(canvasW, lineY); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // Draw obstacles with offset
+      for (const obs of state.obstacles) {
+        const ox = obs.x + offset;
+        if (ox < -60 || ox > canvasW + 60) continue;
+        if (obs.type === 'intermittent' && !obs.intermittentVisible) continue;
+        ctx.fillStyle = QUAD_NEON[qi];
+        ctx.shadowColor = QUAD_NEON[qi];
+        ctx.shadowBlur = 6;
+        const half = obs.size / 2;
+        switch (obs.type) {
+          case 'triangle': ctx.beginPath(); ctx.moveTo(ox, obs.y - half); ctx.lineTo(ox + half, obs.y + half); ctx.lineTo(ox - half, obs.y + half); ctx.closePath(); ctx.fill(); break;
+          case 'circle': ctx.beginPath(); ctx.arc(ox, obs.y, half, 0, Math.PI * 2); ctx.fill(); break;
+          case 'diamond': ctx.beginPath(); ctx.moveTo(ox, obs.y - half); ctx.lineTo(ox + half, obs.y); ctx.lineTo(ox, obs.y + half); ctx.lineTo(ox - half, obs.y); ctx.closePath(); ctx.fill(); break;
+          case 'spike_row': { const c = obs.spikeCount || 3; const sw = 14; for (let i = 0; i < c; i++) { const sx = ox - (c * sw) / 2 + i * sw + sw / 2; ctx.beginPath(); ctx.moveTo(sx - sw / 2, lineY); ctx.lineTo(sx, lineY - obs.size); ctx.lineTo(sx + sw / 2, lineY); ctx.closePath(); ctx.fill(); } break; }
+          case 'bouncing_ball': ctx.beginPath(); ctx.arc(ox, obs.y, obs.size, 0, Math.PI * 2); ctx.fill(); break;
+          default: ctx.fillRect(ox - half, obs.y - half, obs.size, obs.size); break;
+        }
+        ctx.shadowBlur = 0;
+      }
+      // Draw player
       ctx.fillStyle = skinColor;
       ctx.shadowColor = skinColor;
-      ctx.shadowBlur = 10;
-      const gy = state.playerTop.y + (q.y - h / 2) * 0.3;
-      ctx.fillRect(q.x - PLAYER_SIZE / 2 + offset * 0.2, gy - PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+      ctx.shadowBlur = 12;
+      const pt = state.playerTop;
+      ctx.fillRect(pt.x - pt.size / 2, pt.y - pt.size / 2, pt.size, pt.size);
+      ctx.shadowBlur = 0;
+      ctx.restore();
     }
-    // Multiverse label
-    ctx.globalAlpha = alpha * 2;
-    ctx.fillStyle = '#ffffff';
+
+    // Neon dividing lines
+    ctx.globalAlpha = scale;
+    ctx.strokeStyle = '#00ffcc';
+    ctx.shadowColor = '#00ffcc';
+    ctx.shadowBlur = 15;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(canvasW / 2, 0); ctx.lineTo(canvasW / 2, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(canvasW, h / 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // x2 indicator
+    ctx.globalAlpha = scale;
+    ctx.fillStyle = '#ffd700';
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur = 10;
     ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('⚡ MULTIVERSE ⚡', canvasW / 2, 18);
-    // x2 indicator
-    ctx.fillStyle = '#ffd700';
-    ctx.font = 'bold 12px monospace';
-    ctx.fillText('SCORE x2', canvasW / 2, 34);
+    ctx.fillText('SCORE x2', canvasW / 2, h - 12);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // Multiverse intro text
+  if (state.multiverseTextTimer > 0 && state.screen === 'playing') {
+    const textAlpha = state.multiverseTextTimer > 700 ? (1000 - state.multiverseTextTimer) / 300 : state.multiverseTextTimer / 700;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, textAlpha);
+    ctx.fillStyle = '#00ffcc';
+    ctx.shadowColor = '#00ffcc';
+    ctx.shadowBlur = 40;
+    ctx.font = 'bold 42px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('MULTIVERSE', canvasW / 2, h / 2);
+    // Flash effect at start
+    if (state.multiverseTextTimer > 900) {
+      ctx.globalAlpha = (state.multiverseTextTimer - 900) / 100;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvasW, h);
+    }
     ctx.restore();
   }
 
@@ -958,33 +1023,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.fillText('⚠ DISRUPTION ⚠', canvasW / 2, 20); ctx.restore();
   }
 
-  // Darkness mode overlay
-  if (state.darknessFade > 0 && state.screen === 'playing') {
-    ctx.save();
-    // Create darkness mask — black everywhere except around player
-    const playerX = state.playerTop.x;
-    const playerY = state.playerTop.y;
-    const radius = 80;
-    ctx.globalAlpha = state.darknessFade * 0.95;
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, canvasW, h);
-    // Cut out circle around player
-    ctx.globalCompositeOperation = 'destination-out';
-    const grad = ctx.createRadialGradient(playerX, playerY, 0, playerX, playerY, radius);
-    grad.addColorStop(0, 'rgba(0,0,0,1)');
-    grad.addColorStop(0.7, 'rgba(0,0,0,0.8)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(playerX - radius, playerY - radius, radius * 2, radius * 2);
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.restore();
-  }
-
-  // Darkness warning flicker
-  if (state.darknessWarning > 0 && state.screen === 'playing') {
-    const flicker = Math.sin(Date.now() * 0.02) > 0 ? 0.1 : 0;
-    ctx.save(); ctx.globalAlpha = flicker; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, canvasW, h); ctx.restore();
-  }
 
   ctx.restore();
 
