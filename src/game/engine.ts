@@ -13,7 +13,7 @@ import {
   BANNER_HEIGHT,
   SKIN_COLORS,
 } from './constants';
-import { playJump, playLand, playCoin, playDeath, playStreakChime, playWhoosh, updateMusicTempo, stopMusic, playDarknessWarning, playMultiverseActivate, playAdrenalineActivate } from './audio';
+import { playJump, playLand, playCoin, playDeath, playStreakChime, playWhoosh, updateMusicTempo, stopMusic, playMultiverseActivate, playAdrenalineActivate } from './audio';
 
 const MAX_VISIBLE_OBSTACLES = 3;
 const OBSTACLE_SPAWN_X_OFFSET = 64;
