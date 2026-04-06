@@ -148,5 +148,7 @@ export interface GameState {
   multiverseTimer: number;
   multiverseDuration: number;
   nextMultiverseAt: number;
-  multiverseOffsets: number[]; // x offsets for obstacle rendering in each quadrant
+  multiverseOffsets: number[];
+  multiverseTextTimer: number; // "MULTIVERSE" intro text
+  multiverseMergeTimer: number; // merge-back animation
 }

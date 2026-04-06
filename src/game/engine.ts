@@ -436,19 +436,27 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   }
 
   // Multiverse mode
-  if (state.distance >= state.nextMultiverseAt && !state.multiverseActive) {
+  if (state.distance >= state.nextMultiverseAt && !state.multiverseActive && state.multiverseMergeTimer <= 0) {
     state.multiverseActive = true;
     state.multiverseDuration = 10000 + Math.random() * 10000;
     state.multiverseTimer = state.multiverseDuration;
-    state.multiverseOffsets = [0, 60 + Math.random() * 60, -(60 + Math.random() * 60), 30 + Math.random() * 50];
+    state.multiverseOffsets = [0, 60 + Math.random() * 80, -(50 + Math.random() * 70), 30 + Math.random() * 60];
+    state.multiverseTextTimer = 1000; // 1 second intro text
     playMultiverseActivate();
+  }
+  if (state.multiverseTextTimer > 0) {
+    state.multiverseTextTimer = Math.max(0, state.multiverseTextTimer - dt);
   }
   if (state.multiverseActive) {
     state.multiverseTimer -= dt;
     if (state.multiverseTimer <= 0) {
       state.multiverseActive = false;
+      state.multiverseMergeTimer = 500; // merge-back animation
       state.nextMultiverseAt = state.distance + 300 + Math.random() * 300;
     }
+  }
+  if (state.multiverseMergeTimer > 0) {
+    state.multiverseMergeTimer = Math.max(0, state.multiverseMergeTimer - dt);
   }
 
   // Record ghost frame

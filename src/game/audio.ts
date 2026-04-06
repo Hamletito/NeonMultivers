@@ -123,21 +123,6 @@ export function playWhoosh() {
   source.start(c.currentTime);
 }
 
-export function playDarknessWarning() {
-  if (muted) return;
-  const c = getCtx();
-  // Eerie descending tone
-  const osc = c.createOscillator();
-  const gain = c.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(600, c.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(200, c.currentTime + 0.8);
-  gain.gain.setValueAtTime(0.1, c.currentTime);
-  gain.gain.linearRampToValueAtTime(0, c.currentTime + 1.0);
-  osc.connect(gain).connect(c.destination);
-  osc.start(c.currentTime);
-  osc.stop(c.currentTime + 1.0);
-}
 
 export function playMultiverseActivate() {
   if (muted) return;
