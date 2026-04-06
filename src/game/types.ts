@@ -143,13 +143,6 @@ export interface GameState {
   // Cinematic new record
   cinematicSlowMo: number; // remaining ms, 0 = inactive
   cinematicTriggered: boolean;
-  // Darkness mode
-  darknessActive: boolean;
-  darknessTimer: number;
-  darknessDuration: number;
-  nextDarknessAt: number;
-  darknessWarning: number; // countdown before darkness
-  darknessFade: number; // 0-1 for smooth fade
   // Multiverse
   multiverseActive: boolean;
   multiverseTimer: number;
