@@ -1,4 +1,4 @@
-import { GameState, Obstacle, Coin, Particle, Player, DeathAnimation, GhostFrame } from './types';
+import { GameState, Obstacle, Coin, Particle, Player, DeathAnimation, GhostFrame, GameSettings } from './types';
 import {
   BG_COLOR,
   LINE_COLOR,
@@ -13,7 +13,7 @@ import {
   BANNER_HEIGHT,
   SKIN_COLORS,
 } from './constants';
-import { playJump, playLand, playCoin, playDeath, playStreakChime, playWhoosh, updateMusicTempo, stopMusic, playMultiverseActivate, playAdrenalineActivate } from './audio';
+import { playJump, playLand, playCoin, playDeath, playStreakChime, playWhoosh, updateMusicTempo, stopMusic, playMultiverseActivate, playMultiverseWarning, playAdrenalineActivate } from './audio';
 
 const MAX_VISIBLE_OBSTACLES = 3;
 const OBSTACLE_SPAWN_X_OFFSET = 64;
@@ -43,7 +43,6 @@ let passedObstacleIds = new Set<number>();
 let obstacleIdCounter = 0;
 let prevStreakMult = 1;
 
-// Per-quadrant spawn counters for multiverse
 let mvObstacleCounters = [0, 0, 0];
 let mvLastSpawnX = [0, 0, 0];
 
@@ -132,11 +131,16 @@ function chooseObstacleType(distance: number, mustBeEasy: boolean, runCount: num
   if (distance >= 300) types.push('gap');
   if (distance >= 400) { types.push('pendulum'); types.push('wall_gap'); }
   if (distance >= 500) types.push('ceiling_spikes');
+  if (distance >= 700) types.push('double_jump');
+  if (distance >= 800) types.push('spinning_blade');
+  if (distance >= 1000) types.push('fake');
+  // Speed pad is non-lethal, add after 400m
+  if (distance >= 400) types.push('speed_pad');
   return randomFrom(types);
 }
 
 function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: boolean, runCount: number) {
-  if (type === 'spike_row' || type === 'bouncing_ball' || type === 'pendulum' || type === 'gap' || type === 'ceiling_spikes' || type === 'expanding' || type === 'intermittent' || type === 'wall_gap' || type === 'meteor') return 30;
+  if (type === 'spike_row' || type === 'bouncing_ball' || type === 'pendulum' || type === 'gap' || type === 'ceiling_spikes' || type === 'expanding' || type === 'intermittent' || type === 'wall_gap' || type === 'meteor' || type === 'spinning_blade' || type === 'fake' || type === 'speed_pad' || type === 'double_jump') return 30;
   const cap = getObstacleSizeCap(type, distance, runCount);
   const phase = getPhase(distance);
   let minSize = type === 'triangle' || type === 'spike' ? 24 : 22;
@@ -149,7 +153,7 @@ function getObstacleSize(type: Obstacle['type'], distance: number, mustBeEasy: b
 }
 
 function isHardObstacle(obstacle: Obstacle) {
-  return (obstacle.type === 'circle' || obstacle.type === 'star' || obstacle.type === 'spike_row' || obstacle.type === 'bouncing_ball' || obstacle.type === 'wall_gap') && obstacle.size >= 30;
+  return (obstacle.type === 'circle' || obstacle.type === 'star' || obstacle.type === 'spike_row' || obstacle.type === 'bouncing_ball' || obstacle.type === 'wall_gap' || obstacle.type === 'double_jump' || obstacle.type === 'spinning_blade') && obstacle.size >= 30;
 }
 
 function createObstacle(canvasW: number, lineY: number, isTop: boolean, distance: number, mustBeEasy: boolean, canvasH: number, runCount: number): Obstacle {
@@ -166,6 +170,20 @@ function createObstacle(canvasW: number, lineY: number, isTop: boolean, distance
   if (type === 'wall_gap') {
     const gapPos = Math.random() > 0.5 ? 'top' : 'bottom';
     return { x: spawnX, y: lineY, type, size: 30, isTop: true, wallGapPosition: gapPos, wallWidth: 20 };
+  }
+  if (type === 'spinning_blade') {
+    return { x: spawnX, y: lineY, type, size: 30, isTop: true, bladeAngle: 0 };
+  }
+  if (type === 'fake') {
+    // Looks like a triangle but no hitbox
+    return { x: spawnX, y: lineY - 15, type, size: 28, isTop: true, isFake: true };
+  }
+  if (type === 'speed_pad') {
+    return { x: spawnX, y: lineY, type, size: 40, isTop: true, speedPadActive: true };
+  }
+  if (type === 'double_jump') {
+    // Tall obstacle requiring high jump
+    return { x: spawnX, y: lineY - 35, type, size: 45, isTop: true };
   }
   const y = isTop ? lineY - size / 2 : lineY + size / 2;
   return { x: spawnX, y, type, size, isTop };
@@ -213,8 +231,35 @@ function saveBestGhost(frames: GhostFrame[]) {
   try { localStorage.setItem('bestGhostJumps', JSON.stringify(frames)); } catch {}
 }
 
+function loadSettings(): GameSettings {
+  try {
+    const raw = localStorage.getItem('gameSettings');
+    if (raw) return { ...defaultSettings(), ...JSON.parse(raw) };
+  } catch {}
+  return defaultSettings();
+}
+
+function defaultSettings(): GameSettings {
+  return {
+    masterVolume: 1,
+    musicEnabled: true,
+    sfxEnabled: true,
+    particlesEnabled: true,
+    screenShakeEnabled: true,
+    bgAnimEnabled: true,
+    showDistance: true,
+    showStreak: true,
+    showAdrenaline: true,
+    controlSensitivity: 'normal',
+    dailyNotifications: true,
+    seasonAlerts: true,
+    playerName: 'Runner',
+  };
+}
+
 export function createInitialState(): GameState {
   const runCount = getRunCount();
+  const settings = loadSettings();
   return {
     screen: 'menu', score: 0, bestScore: parseInt(localStorage.getItem('bestScore') || '0'),
     coins: parseInt(localStorage.getItem('coins') || '0'), totalCoins: parseInt(localStorage.getItem('coins') || '0'),
@@ -225,6 +270,9 @@ export function createInitialState(): GameState {
     equippedSkin: localStorage.getItem('equippedSkin') || 'default',
     equippedTrail: localStorage.getItem('equippedTrail') || '',
     equippedDeath: localStorage.getItem('equippedDeath') || '',
+    equippedJump: localStorage.getItem('equippedJump') || '',
+    equippedBackground: localStorage.getItem('equippedBackground') || '',
+    equippedFloor: localStorage.getItem('equippedFloor') || '',
     screenShake: 0, coinFlash: 0, streak: 0, streakMultiplier: 1,
     tauntText: '', tauntTimer: 0, shownTaunts: new Set(), newRecordShown: false,
     ...defaultExtraState(),
@@ -240,9 +288,15 @@ export function createInitialState(): GameState {
     multiverseOffsets: [0, 80, -60, 40],
     multiverseTextTimer: 0, multiverseMergeTimer: 0,
     multiverseObstacles: [[], [], []],
+    multiverseCount: 0,
+    multiverseWarningTimer: 0,
     floorWaveTimer: 0, floorWavePhase: 0, nextFloorWaveAt: 300 + Math.random() * 100,
     meteorShowerTimer: 0, nextMeteorAt: 500 + Math.random() * 100,
     tunnelTimer: 0, nextTunnelAt: 600 + Math.random() * 100, tunnelAmount: 0,
+    speedBoostTimer: 0, speedBoostSlowTimer: 0,
+    chaosMode: false,
+    chaosUnlocked: localStorage.getItem('chaosUnlocked') === 'true',
+    settings,
   };
 }
 
@@ -262,13 +316,16 @@ export function resetForNewGame(state: GameState): GameState {
     adrenaline: 0, adrenalineActive: false, adrenalineTimer: 0, lastDodgeTime: 0,
     cinematicSlowMo: 0, cinematicTriggered: false,
     multiverseActive: false, multiverseTimer: 0, multiverseDuration: 0,
-    nextMultiverseAt: 300 + Math.random() * 200,
+    nextMultiverseAt: state.chaosMode ? (150 + Math.random() * 100) : (300 + Math.random() * 200),
     multiverseOffsets: [0, 60 + Math.random() * 60, -(60 + Math.random() * 60), 30 + Math.random() * 50],
     multiverseTextTimer: 0, multiverseMergeTimer: 0,
     multiverseObstacles: [[], [], []],
+    multiverseCount: 0,
+    multiverseWarningTimer: 0,
     floorWaveTimer: 0, floorWavePhase: 0, nextFloorWaveAt: 300 + Math.random() * 100,
     meteorShowerTimer: 0, nextMeteorAt: 500 + Math.random() * 100,
     tunnelTimer: 0, nextTunnelAt: 600 + Math.random() * 100, tunnelAmount: 0,
+    speedBoostTimer: 0, speedBoostSlowTimer: 0,
   };
 }
 
@@ -276,8 +333,107 @@ function addParticles(particles: Particle[], x: number, y: number, color: string
   for (let i = 0; i < count; i++) particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 1, maxLife: 1, color, size: 2 + Math.random() * 3 });
 }
 
-function addTrailParticle(particles: Particle[], p: Player, color: string) {
-  particles.push({ x: p.x - p.size / 2 - 2, y: p.y + (Math.random() - 0.5) * p.size * 0.5, vx: -1 - Math.random(), vy: (Math.random() - 0.5) * 0.5, life: 0.6, maxLife: 0.6, color, size: 1.5 + Math.random() * 2 });
+function addTrailParticle(particles: Particle[], p: Player, color: string, trailType: string) {
+  let pc = color;
+  let sz = 1.5 + Math.random() * 2;
+  let vxMod = -1 - Math.random();
+  let vyMod = (Math.random() - 0.5) * 0.5;
+  let life = 0.6;
+
+  switch (trailType) {
+    case 'trail_fire':
+      pc = randomFrom(['#ff4400', '#ff8800', '#ffcc00']);
+      sz = 2 + Math.random() * 3;
+      life = 0.4;
+      break;
+    case 'trail_ice':
+      pc = randomFrom(['#88ddff', '#aaeeff', '#ffffff']);
+      sz = 1.5 + Math.random() * 2;
+      break;
+    case 'trail_electric':
+      pc = randomFrom(['#00ffff', '#88ffff', '#ffff00']);
+      vxMod = -2 - Math.random() * 2;
+      vyMod = (Math.random() - 0.5) * 3;
+      sz = 1 + Math.random() * 2;
+      life = 0.3;
+      break;
+    case 'trail_bubble':
+      pc = randomFrom(['#88ccff', '#aaddff', '#cceeFF']);
+      sz = 3 + Math.random() * 3;
+      vyMod = -0.5 - Math.random() * 0.5;
+      life = 0.8;
+      break;
+    case 'trail_star':
+      pc = randomFrom(['#ffdd00', '#ffaa00', '#ffffff']);
+      sz = 2 + Math.random() * 2;
+      break;
+    case 'trail_smoke':
+      pc = randomFrom(['#666666', '#888888', '#aaaaaa']);
+      sz = 3 + Math.random() * 4;
+      life = 0.8;
+      vyMod = -0.3 - Math.random() * 0.3;
+      break;
+  }
+
+  particles.push({
+    x: p.x - p.size / 2 - 2,
+    y: p.y + (Math.random() - 0.5) * p.size * 0.5,
+    vx: vxMod, vy: vyMod, life, maxLife: life, color: pc, size: sz
+  });
+}
+
+function addJumpEffect(particles: Particle[], p: Player, jumpType: string) {
+  switch (jumpType) {
+    case 'jump_rings':
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        particles.push({ x: p.x + Math.cos(angle) * 15, y: p.y + Math.sin(angle) * 15, vx: Math.cos(angle) * 2, vy: Math.sin(angle) * 2, life: 0.5, maxLife: 0.5, color: '#00ffcc', size: 2 });
+      }
+      break;
+    case 'jump_cloud':
+      for (let i = 0; i < 6; i++) {
+        particles.push({ x: p.x + (Math.random() - 0.5) * 20, y: p.y + p.size / 2, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 1, life: 0.6, maxLife: 0.6, color: '#cccccc', size: 4 + Math.random() * 4 });
+      }
+      break;
+    case 'jump_spark':
+      for (let i = 0; i < 8; i++) {
+        particles.push({ x: p.x, y: p.y + p.size / 2, vx: (Math.random() - 0.5) * 6, vy: Math.random() * 3, life: 0.3, maxLife: 0.3, color: randomFrom(['#ffdd00', '#ff8800', '#ffffff']), size: 1.5 + Math.random() * 2 });
+      }
+      break;
+    case 'jump_shockwave':
+      for (let i = 0; i < 16; i++) {
+        const angle = (i / 16) * Math.PI * 2;
+        particles.push({ x: p.x + Math.cos(angle) * 10, y: p.y + Math.sin(angle) * 10, vx: Math.cos(angle) * 4, vy: Math.sin(angle) * 4, life: 0.3, maxLife: 0.3, color: '#88ccff', size: 2 });
+      }
+      break;
+  }
+}
+
+function addDeathEffect(particles: Particle[], x: number, y: number, color: string, deathType: string) {
+  switch (deathType) {
+    case 'death_confetti':
+      for (let i = 0; i < 30; i++) {
+        particles.push({ x, y, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10, life: 1.5, maxLife: 1.5, color: randomFrom(['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']), size: 3 + Math.random() * 3 });
+      }
+      break;
+    case 'death_nuclear':
+      for (let i = 0; i < 40; i++) {
+        const angle = (i / 40) * Math.PI * 2;
+        const speed = 3 + Math.random() * 5;
+        particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1.5, maxLife: 1.5, color: randomFrom(['#ff4400', '#ff8800', '#ffcc00', '#ffffff']), size: 2 + Math.random() * 4 });
+      }
+      break;
+    case 'death_diamond':
+      for (let i = 0; i < 20; i++) {
+        particles.push({ x, y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 1.2, maxLife: 1.2, color: randomFrom(['#88ddff', '#aaeeff', '#ffffff', '#ccddff']), size: 3 + Math.random() * 3, isDeathPiece: true, width: 6, height: 6, rotationSpeed: (Math.random() - 0.5) * 8, angle: Math.random() * Math.PI * 2 });
+      }
+      break;
+    case 'death_firerain':
+      for (let i = 0; i < 25; i++) {
+        particles.push({ x: x + (Math.random() - 0.5) * 60, y: y - 50 - Math.random() * 100, vx: (Math.random() - 0.5) * 2, vy: 3 + Math.random() * 5, life: 1.5, maxLife: 1.5, color: randomFrom(['#ff4400', '#ff8800', '#ffcc00']), size: 2 + Math.random() * 3 });
+      }
+      break;
+  }
 }
 
 function addLandingParticles(particles: Particle[], p: Player, lineY: number, color: string) {
@@ -285,6 +441,12 @@ function addLandingParticles(particles: Particle[], p: Player, lineY: number, co
 }
 
 function checkCollision(player: Player, obs: Obstacle, lineY: number): boolean {
+  if (obs.type === 'fake') return false; // Fake obstacles never collide
+  if (obs.type === 'speed_pad') {
+    // Speed pad triggers when player runs over it at ground level
+    const dx = Math.abs(player.x - obs.x);
+    return dx < (player.size / 2 + obs.size / 2) * 0.85 && !player.isJumping;
+  }
   const shrink = 0.85;
   if (obs.type === 'gap') { const gw = obs.gapWidth || 100; return player.x > obs.x - gw / 2 && player.x < obs.x + gw / 2 && !player.isJumping; }
   if (obs.type === 'intermittent' && !obs.intermittentVisible) return false;
@@ -297,18 +459,29 @@ function checkCollision(player: Player, obs: Obstacle, lineY: number): boolean {
     const ww = obs.wallWidth || 20;
     const dx = Math.abs(player.x - obs.x);
     if (dx > (player.size / 2 + ww / 2) * shrink) return false;
-    const gapH = PLAYER_SIZE * 2.5;
-    if (obs.wallGapPosition === 'bottom') {
-      // Gap is at ground level - player must stay on ground (not jumping) to survive
-      return player.isJumping; // jumping into the wall = death
-    } else {
-      // Gap is at top - player must jump to survive
-      return !player.isJumping; // staying on ground = death
-    }
+    if (obs.wallGapPosition === 'bottom') return player.isJumping;
+    else return !player.isJumping;
   }
   if (obs.type === 'meteor') {
     const dx = player.x - obs.x; const dy = player.y - obs.y;
     return Math.sqrt(dx * dx + dy * dy) < (player.size / 2 + obs.size / 2) * shrink;
+  }
+  if (obs.type === 'spinning_blade') {
+    const bladeRadius = 25;
+    const angle = obs.bladeAngle || 0;
+    // Check collision with blade tip positions
+    const tipX = obs.x + Math.cos(angle) * bladeRadius;
+    const tipY = (lineY - 15) + Math.sin(angle) * bladeRadius;
+    const dx = player.x - tipX; const dy = player.y - tipY;
+    if (Math.sqrt(dx * dx + dy * dy) < (player.size / 2 + 8) * shrink) return true;
+    const tipX2 = obs.x + Math.cos(angle + Math.PI) * bladeRadius;
+    const tipY2 = (lineY - 15) + Math.sin(angle + Math.PI) * bladeRadius;
+    const dx2 = player.x - tipX2; const dy2 = player.y - tipY2;
+    return Math.sqrt(dx2 * dx2 + dy2 * dy2) < (player.size / 2 + 8) * shrink;
+  }
+  if (obs.type === 'double_jump') {
+    const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y);
+    return dx < (player.size / 2 + 15) * shrink && dy < (player.size / 2 + obs.size / 2) * shrink;
   }
   const dx = Math.abs(player.x - obs.x); const dy = Math.abs(player.y - obs.y);
   return dx < (player.size / 2 + obs.size / 2) * shrink && dy < (player.size / 2 + obs.size / 2) * shrink;
@@ -326,7 +499,7 @@ function getDeathType(obsType: Obstacle['type']): DeathAnimation['type'] {
     case 'triangle': return 'triangle_split';
     case 'circle': return 'circle_bounce';
     case 'bouncing_ball': return 'ball_flatten';
-    case 'spike_row': case 'spike': case 'ceiling_spikes': case 'expanding': case 'intermittent': case 'wall_gap': case 'meteor': return 'spike_shatter';
+    case 'spike_row': case 'spike': case 'ceiling_spikes': case 'expanding': case 'intermittent': case 'wall_gap': case 'meteor': case 'spinning_blade': case 'double_jump': return 'spike_shatter';
     case 'gap': return 'gap_fall';
     default: return 'default';
   }
@@ -367,6 +540,10 @@ export function resetSpawners() {
 function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: number, obsType: Obstacle['type']) {
   const deathType = getDeathType(obsType);
   addDeathParticles(state.particles, deathType, p.x, p.y, skinColor, p.size);
+  // Custom death effect from shop
+  if (state.equippedDeath) {
+    addDeathEffect(state.particles, p.x, p.y, skinColor, state.equippedDeath);
+  }
   if (state.playerBottom) addParticles(state.particles, state.playerBottom.x, state.playerBottom.y, skinColor, 30);
   state.deathAnim = { type: deathType, timer: 1.5, x: p.x, y: p.y, color: skinColor };
   state.screenShake = 0;
@@ -398,7 +575,6 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   if (state.screen !== 'playing') return state;
 
   const baseLineY = (canvasH - BANNER_HEIGHT) / 2;
-  // Floor wave modifies lineY
   let lineY = baseLineY;
   if (state.floorWaveTimer > 0) {
     lineY = baseLineY + Math.sin(state.floorWavePhase) * 30;
@@ -409,18 +585,30 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   const runCount = state.runCount;
 
   const spawnProfile = getSpawnProfile(state.distance, runCount);
-  state.speed = Math.min(MAX_SPEED, state.baseSpeed * spawnProfile.speedMult + state.distance * SPEED_INCREMENT * 0.3);
-  updateMusicTempo(spawnProfile.speedMult);
+  let speedMult = spawnProfile.speedMult;
+  if (state.chaosMode) speedMult *= 1.2;
+  state.speed = Math.min(MAX_SPEED, state.baseSpeed * speedMult + state.distance * SPEED_INCREMENT * 0.3);
+  updateMusicTempo(speedMult);
 
   let effectiveSpeed = state.speed;
   const slowmo = state.activePowers.find(p => p.type === 'slowmo');
   if (slowmo) effectiveSpeed *= 0.5;
   if (state.adrenalineActive) effectiveSpeed *= 0.5;
   if (state.cinematicSlowMo > 0) effectiveSpeed *= 0.5;
+  // Speed boost
+  if (state.speedBoostTimer > 0) effectiveSpeed *= 1.5;
+  if (state.speedBoostSlowTimer > 0) effectiveSpeed *= 0.7;
 
   state.activePowers = state.activePowers.map(p => ({ ...p, remaining: p.remaining - dt })).filter(p => p.remaining > 0);
   state.distance += effectiveSpeed * 0.1;
   state.score = Math.floor(state.distance);
+
+  // Speed boost timers
+  if (state.speedBoostTimer > 0) {
+    state.speedBoostTimer = Math.max(0, state.speedBoostTimer - dt);
+    if (state.speedBoostTimer <= 0) state.speedBoostSlowTimer = 1000;
+  }
+  if (state.speedBoostSlowTimer > 0) state.speedBoostSlowTimer = Math.max(0, state.speedBoostSlowTimer - dt);
 
   // Adrenaline timer
   if (state.adrenalineActive) {
@@ -464,7 +652,6 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   }
   if (state.meteorShowerTimer > 0) {
     state.meteorShowerTimer -= dt;
-    // Spawn falling meteors
     if (Math.random() < 0.08) {
       const mx = Math.random() * canvasW;
       state.obstacles.push({ x: mx, y: -20, type: 'meteor', size: 12 + Math.random() * 10, isTop: true, meteorVy: 3 + Math.random() * 3 });
@@ -482,13 +669,10 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   }
   if (state.tunnelTimer > 0) {
     state.tunnelTimer -= dt;
-    // Ramp up tunnel amount
     const progress = 1 - state.tunnelTimer / 2000;
     if (progress < 0.2) state.tunnelAmount = progress / 0.2;
     else if (progress > 0.8) state.tunnelAmount = (1 - progress) / 0.2;
     else state.tunnelAmount = 1;
-
-    // If player jumps during tunnel, they die (ceiling is too low)
     if (state.tunnelAmount > 0.5 && state.playerTop.isJumping) {
       const ceilingY = lineY - PLAYER_SIZE * 1.5 * (1 - state.tunnelAmount * 0.6);
       if (state.playerTop.y < ceilingY) {
@@ -497,7 +681,6 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
         return state;
       }
     }
-
     if (state.tunnelTimer <= 0) {
       state.tunnelTimer = 0;
       state.tunnelAmount = 0;
@@ -505,26 +688,52 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
-  // Multiverse mode
-  if (state.distance >= state.nextMultiverseAt && !state.multiverseActive && state.multiverseMergeTimer <= 0) {
-    state.multiverseActive = true;
-    state.multiverseDuration = 10000 + Math.random() * 10000;
-    state.multiverseTimer = state.multiverseDuration;
-    state.multiverseOffsets = [0, 60 + Math.random() * 80, -(50 + Math.random() * 70), 30 + Math.random() * 60];
-    state.multiverseTextTimer = 1000;
-    // Initialize independent obstacles for each quadrant
-    state.multiverseObstacles = [[], [], []];
-    mvObstacleCounters = [0, 0, 0];
-    mvLastSpawnX = [canvasW, canvasW, canvasW];
-    playMultiverseActivate();
+  // Multiverse warning + activation
+  const mvTriggerDist = state.chaosMode ? (150 + Math.random() * 0.01) : state.nextMultiverseAt;
+  if (state.distance >= mvTriggerDist && !state.multiverseActive && state.multiverseMergeTimer <= 0 && state.multiverseWarningTimer <= 0) {
+    state.multiverseWarningTimer = 3000; // 3 second warning
+    playMultiverseWarning();
+  }
+  if (state.multiverseWarningTimer > 0) {
+    state.multiverseWarningTimer -= dt;
+    // Screen shake during warning
+    if (state.settings.screenShakeEnabled) {
+      state.screenShake = Math.max(state.screenShake, 0.3);
+    }
+    if (state.multiverseWarningTimer <= 0) {
+      // Activate multiverse
+      state.multiverseActive = true;
+      state.multiverseDuration = 10000 + Math.random() * 10000;
+      state.multiverseTimer = state.multiverseDuration;
+      state.multiverseOffsets = [0, 60 + Math.random() * 80, -(50 + Math.random() * 70), 30 + Math.random() * 60];
+      state.multiverseTextTimer = 1000;
+      state.multiverseObstacles = [[], [], []];
+      mvObstacleCounters = [0, 0, 0];
+      mvLastSpawnX = [canvasW, canvasW, canvasW];
+      state.multiverseCount++;
+      playMultiverseActivate();
+    }
   }
   if (state.multiverseTextTimer > 0) state.multiverseTextTimer = Math.max(0, state.multiverseTextTimer - dt);
   if (state.multiverseActive) {
     state.multiverseTimer -= dt;
 
-    // Spawn independent obstacles for each multiverse quadrant
+    // Progressive difficulty based on multiverseCount
     for (let qi = 0; qi < 3; qi++) {
       const qObs = state.multiverseObstacles[qi];
+
+      // For count=1, all quadrants use main obstacles (identical)
+      // For count=2, top quadrants (qi=0) identical, bottom (qi=1,2) slightly offset
+      // For count>=3, fully independent
+      if (state.multiverseCount === 1) {
+        // Mirror main obstacles - skip independent spawning
+        continue;
+      }
+      if (state.multiverseCount === 2 && qi === 0) {
+        // First extra quadrant mirrors main
+        continue;
+      }
+
       const visCount = qObs.filter(o => o.x > -60 && o.x < canvasW + 60).length;
       if (visCount < MAX_VISIBLE_OBSTACLES) {
         const minGap = spawnProfile.minGap;
@@ -536,7 +745,6 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
           qObs.push(obs);
         }
       }
-      // Move multiverse obstacles
       for (const obs of qObs) {
         if (obs.type === 'bouncing_ball' && obs.bouncePhase !== undefined && obs.baseY !== undefined) {
           obs.bouncePhase += (obs.bounceSpeed || 0.004) * dt;
@@ -562,14 +770,19 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
           obs.intermittentPhase = (obs.intermittentPhase || 0) + dt;
           if (obs.intermittentPhase >= 800) { obs.intermittentPhase = 0; obs.intermittentVisible = !obs.intermittentVisible; }
         }
+        if (obs.type === 'spinning_blade') {
+          obs.bladeAngle = (obs.bladeAngle || 0) + dt * 0.005;
+        }
       }
       state.multiverseObstacles[qi] = qObs.filter(o => o.x > -120);
 
-      // Check collisions for multiverse quadrant obstacles
       for (const obs of state.multiverseObstacles[qi]) {
         const pt = state.playerTop;
         if (checkCollision(pt, obs, baseLineY)) {
-          if (state.hasShield) {
+          if (obs.type === 'speed_pad') {
+            state.speedBoostTimer = 2000;
+            state.multiverseObstacles[qi] = state.multiverseObstacles[qi].filter(o => o !== obs);
+          } else if (state.hasShield) {
             state.hasShield = false;
             state.multiverseObstacles[qi] = state.multiverseObstacles[qi].filter(o => o !== obs);
             addParticles(state.particles, pt.x, pt.y, '#00ffcc', 15);
@@ -586,7 +799,8 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if (state.multiverseTimer <= 0) {
       state.multiverseActive = false;
       state.multiverseMergeTimer = 500;
-      state.nextMultiverseAt = state.distance + 300 + Math.random() * 300;
+      const nextDist = state.chaosMode ? (state.distance + 100 + Math.random() * 150) : (state.distance + 300 + Math.random() * 300);
+      state.nextMultiverseAt = nextDist;
       state.multiverseObstacles = [[], [], []];
     }
   }
@@ -632,7 +846,8 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   const currentMilestone = Math.floor(state.distance / 100) * 100;
   if (currentMilestone > lastMilestone && currentMilestone > 0) { lastMilestone = currentMilestone; milestoneFlashTimer = 1.5; milestoneFlashScore = currentMilestone; }
   if (milestoneFlashTimer > 0) milestoneFlashTimer = Math.max(0, milestoneFlashTimer - dt / 1000);
-  if (state.screenShake > 0) state.screenShake = Math.max(0, state.screenShake - dt * 0.01);
+  if (state.screenShake > 0 && state.settings.screenShakeEnabled) state.screenShake = Math.max(0, state.screenShake - dt * 0.01);
+  else if (!state.settings.screenShakeEnabled) state.screenShake = 0;
   if (state.coinFlash > 0) state.coinFlash = Math.max(0, state.coinFlash - dt * 0.005);
 
   if (state.phase === 1 && state.distance >= state.phaseThreshold) {
@@ -646,8 +861,12 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   if (pt.isJumping) { pt.vy += GRAVITY; pt.y += pt.vy; if (pt.y >= lineY - PLAYER_SIZE / 2) { pt.y = lineY - PLAYER_SIZE / 2; pt.vy = 0; pt.isJumping = false; } }
   else pt.y = lineY - PLAYER_SIZE / 2;
   if (ptWasJumping && !pt.isJumping) { pt.landTimer = 100; pt.rotation = 0; addLandingParticles(state.particles, pt, lineY, skinColor); playLand(); }
+  // Jump effect
+  if (!ptWasJumping && pt.isJumping && state.equippedJump && state.settings.particlesEnabled) {
+    addJumpEffect(state.particles, pt, state.equippedJump);
+  }
   updatePlayerAnim(pt, dt);
-  if (frameCount % 3 === 0) addTrailParticle(state.particles, pt, skinColor);
+  if (frameCount % 3 === 0 && state.settings.particlesEnabled) addTrailParticle(state.particles, pt, skinColor, state.equippedTrail);
 
   if (state.playerBottom) {
     const pb = state.playerBottom;
@@ -655,8 +874,11 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if (pb.isJumping) { pb.vy -= GRAVITY; pb.y += pb.vy; if (pb.y <= lineY + PLAYER_SIZE / 2) { pb.y = lineY + PLAYER_SIZE / 2; pb.vy = 0; pb.isJumping = false; } }
     else pb.y = lineY + PLAYER_SIZE / 2;
     if (pbWas && !pb.isJumping) { pb.landTimer = 100; pb.rotation = 0; addLandingParticles(state.particles, pb, lineY, skinColor); }
+    if (!pbWas && pb.isJumping && state.equippedJump && state.settings.particlesEnabled) {
+      addJumpEffect(state.particles, pb, state.equippedJump);
+    }
     updatePlayerAnim(pb, dt);
-    if (frameCount % 3 === 0) addTrailParticle(state.particles, pb, skinColor);
+    if (frameCount % 3 === 0 && state.settings.particlesEnabled) addTrailParticle(state.particles, pb, skinColor, state.equippedTrail);
   }
 
   // Update obstacles
@@ -675,6 +897,9 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
     if (obs.type === 'meteor' && obs.meteorVy) {
       obs.y += obs.meteorVy;
+    }
+    if (obs.type === 'spinning_blade') {
+      obs.bladeAngle = (obs.bladeAngle || 0) + dt * 0.005;
     }
   }
 
@@ -709,7 +934,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
 
   state.obstacles = state.obstacles.map(o => {
     if (o.type === 'pendulum' && o.anchorX !== undefined) { o.anchorX -= effectiveSpeed; return o; }
-    if (o.type === 'meteor') return o; // Meteors move vertically only
+    if (o.type === 'meteor') return o;
     return { ...o, x: o.x - effectiveSpeed };
   }).filter(o => o.x > -120 && (o.type !== 'meteor' || o.y < canvasH + 50));
 
@@ -754,7 +979,17 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
 
   // Collision check for main obstacles
   for (const obs of state.obstacles) {
-    if (obs.type === 'gap' || obs.type === 'ceiling_spikes' || obs.type === 'bouncing_ball' || obs.type === 'pendulum' || obs.type === 'expanding' || obs.type === 'intermittent' || obs.type === 'wall_gap' || obs.type === 'meteor') {
+    if (obs.type === 'fake') continue; // Fake obstacles - no collision
+    if (obs.type === 'speed_pad') {
+      // Speed pad is non-lethal
+      if (checkCollision(pt, obs, lineY)) {
+        state.speedBoostTimer = 2000;
+        state.obstacles = state.obstacles.filter(o => o !== obs);
+        addParticles(state.particles, pt.x, pt.y, '#00ff00', 10);
+      }
+      continue;
+    }
+    if (obs.type === 'gap' || obs.type === 'ceiling_spikes' || obs.type === 'bouncing_ball' || obs.type === 'pendulum' || obs.type === 'expanding' || obs.type === 'intermittent' || obs.type === 'wall_gap' || obs.type === 'meteor' || obs.type === 'spinning_blade' || obs.type === 'double_jump') {
       for (const p of [pt, state.playerBottom].filter(Boolean) as Player[]) {
         if (checkCollision(p, obs, lineY)) {
           if (state.hasShield) { state.hasShield = false; state.obstacles = state.obstacles.filter(o => o !== obs); addParticles(state.particles, p.x, p.y, '#00ffcc', 15); }
@@ -775,11 +1010,15 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if ((state as any).screen === 'gameover') break;
   }
 
-  state.particles = state.particles.map(p => {
-    const np = { ...p, x: p.x + p.vx, y: p.y + p.vy, life: p.life - 0.02 };
-    if (p.isDeathPiece) { np.vy = (np.vy || 0) + 0.15; if (p.angle !== undefined && p.rotationSpeed) np.angle = p.angle + p.rotationSpeed * 0.016; }
-    return np;
-  }).filter(p => p.life > 0);
+  if (state.settings.particlesEnabled) {
+    state.particles = state.particles.map(p => {
+      const np = { ...p, x: p.x + p.vx, y: p.y + p.vy, life: p.life - 0.02 };
+      if (p.isDeathPiece) { np.vy = (np.vy || 0) + 0.15; if (p.angle !== undefined && p.rotationSpeed) np.angle = p.angle + p.rotationSpeed * 0.016; }
+      return np;
+    }).filter(p => p.life > 0);
+  } else {
+    state.particles = [];
+  }
 
   return state;
 }
@@ -810,6 +1049,194 @@ function getCurrentTheme(state: GameState) {
   };
 }
 
+function getEquippedBgColor(bgId: string, theme: { bg: string }): string {
+  switch (bgId) {
+    case 'bg_stars': return '#0a0a1a';
+    case 'bg_matrix': return '#000a00';
+    case 'bg_galaxy': return '#0a0020';
+    case 'bg_cyberpunk': return '#0a0a15';
+    default: return theme.bg;
+  }
+}
+
+function renderEquippedBackground(ctx: CanvasRenderingContext2D, bgId: string, canvasW: number, h: number) {
+  switch (bgId) {
+    case 'bg_stars':
+      for (let i = 0; i < 40; i++) {
+        const sx = (i * 97 + frameCount * 0.3) % canvasW;
+        const sy = (i * 73) % h;
+        const brightness = 0.3 + 0.7 * Math.sin(frameCount * 0.02 + i);
+        ctx.globalAlpha = brightness;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+      ctx.globalAlpha = 1;
+      break;
+    case 'bg_matrix':
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = '#00ff00';
+      ctx.font = '12px monospace';
+      for (let col = 0; col < canvasW / 14; col++) {
+        const chars = 'アイウエオカキクケコ0123456789';
+        const y = ((frameCount * 2 + col * 37) % (h + 100)) - 50;
+        ctx.fillText(chars[col % chars.length], col * 14, y);
+      }
+      ctx.globalAlpha = 1;
+      break;
+    case 'bg_galaxy':
+      ctx.globalAlpha = 0.1;
+      const grd = ctx.createRadialGradient(canvasW / 2, h / 2, 50, canvasW / 2, h / 2, h);
+      grd.addColorStop(0, '#6600cc');
+      grd.addColorStop(0.5, '#330066');
+      grd.addColorStop(1, 'transparent');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, canvasW, h);
+      ctx.globalAlpha = 1;
+      break;
+    case 'bg_cyberpunk':
+      ctx.globalAlpha = 0.08;
+      ctx.fillStyle = '#ff00ff';
+      // City silhouette
+      for (let i = 0; i < 15; i++) {
+        const bw = 30 + (i * 17) % 40;
+        const bh = 60 + (i * 31) % 120;
+        const bx = ((i * 67) % canvasW);
+        ctx.fillRect(bx, h - bh, bw, bh);
+      }
+      ctx.globalAlpha = 1;
+      break;
+  }
+}
+
+function renderEquippedFloor(ctx: CanvasRenderingContext2D, floorId: string, lineY: number, canvasW: number, theme: { line: string }) {
+  switch (floorId) {
+    case 'floor_electric':
+      ctx.strokeStyle = '#00ffff';
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = 15;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, lineY);
+      for (let x = 0; x < canvasW; x += 10) {
+        const zy = lineY + (Math.random() - 0.5) * 6;
+        ctx.lineTo(x, zy);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      return true;
+    case 'floor_fire':
+      ctx.strokeStyle = '#ff4400';
+      ctx.shadowColor = '#ff4400';
+      ctx.shadowBlur = 15;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, lineY);
+      ctx.lineTo(canvasW, lineY);
+      ctx.stroke();
+      // Flame particles
+      ctx.globalAlpha = 0.4;
+      for (let x = 0; x < canvasW; x += 20) {
+        const fh = 5 + Math.sin(x * 0.1 + frameCount * 0.05) * 5;
+        ctx.fillStyle = Math.random() > 0.5 ? '#ff4400' : '#ffcc00';
+        ctx.beginPath();
+        ctx.moveTo(x, lineY);
+        ctx.lineTo(x + 5, lineY - fh);
+        ctx.lineTo(x + 10, lineY);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      return true;
+    case 'floor_ice':
+      ctx.strokeStyle = '#88ddff';
+      ctx.shadowColor = '#88ddff';
+      ctx.shadowBlur = 15;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, lineY);
+      ctx.lineTo(canvasW, lineY);
+      ctx.stroke();
+      // Ice crystals
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = '#aaeeff';
+      for (let x = 0; x < canvasW; x += 30) {
+        ctx.beginPath();
+        ctx.moveTo(x, lineY - 3);
+        ctx.lineTo(x + 3, lineY - 8);
+        ctx.lineTo(x + 6, lineY - 3);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      return true;
+    case 'floor_rainbow':
+      const colors = ['#ff0000', '#ff8800', '#ffff00', '#00ff00', '#0088ff', '#8800ff'];
+      const segW = canvasW / colors.length;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 10;
+      colors.forEach((color, i) => {
+        const offset = (frameCount * 2) % canvasW;
+        const sx = ((i * segW + offset) % canvasW);
+        ctx.strokeStyle = color;
+        ctx.shadowColor = color;
+        ctx.beginPath();
+        ctx.moveTo(sx, lineY);
+        ctx.lineTo(Math.min(sx + segW, canvasW), lineY);
+        ctx.stroke();
+      });
+      ctx.shadowBlur = 0;
+      return true;
+  }
+  return false;
+}
+
+function drawPlayerShape(ctx: CanvasRenderingContext2D, skinId: string, size: number, skinColor: string) {
+  const half = size / 2;
+  if (skinId === 'shape_circle') {
+    ctx.beginPath();
+    ctx.arc(0, 0, half, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (skinId === 'shape_triangle') {
+    ctx.beginPath();
+    ctx.moveTo(0, -half);
+    ctx.lineTo(half, half);
+    ctx.lineTo(-half, half);
+    ctx.closePath();
+    ctx.fill();
+  } else if (skinId === 'shape_star') {
+    drawStar(ctx, 0, 0, 5, half, half / 2);
+  } else if (skinId === 'phantom') {
+    // Outline only
+    ctx.strokeStyle = skinColor;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = skinColor;
+    ctx.shadowBlur = 20;
+    ctx.strokeRect(-half, -half, size, size);
+    return; // Don't fill
+  } else if (skinId === 'nova') {
+    ctx.fillRect(-half, -half, size, size);
+    // Explosive glow
+    ctx.globalAlpha = 0.3 + 0.2 * Math.sin(Date.now() * 0.008);
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur = 40;
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    return;
+  } else if (skinId === 'prism') {
+    const hue = (Date.now() * 0.1) % 360;
+    ctx.fillStyle = `hsl(${hue}, 100%, 60%)`;
+    ctx.shadowColor = `hsl(${hue}, 100%, 60%)`;
+    ctx.fillRect(-half, -half, size, size);
+    return;
+  } else {
+    ctx.fillRect(-half, -half, size, size);
+  }
+}
+
 export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW: number, canvasH: number) {
   const h = canvasH - BANNER_HEIGHT;
   const baseLineY = h / 2;
@@ -818,7 +1245,13 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   const theme = getCurrentTheme(state);
 
   let shakeX = 0, shakeY = 0;
-  if (state.screen === 'playing' && state.screenShake > 0) { const i = state.screenShake * 8; shakeX = (Math.random() - 0.5) * i; shakeY = (Math.random() - 0.5) * i; }
+  if (state.screen === 'playing' && state.screenShake > 0 && state.settings.screenShakeEnabled) { const i = state.screenShake * 8; shakeX = (Math.random() - 0.5) * i; shakeY = (Math.random() - 0.5) * i; }
+  // Warning shake
+  if (state.multiverseWarningTimer > 0 && state.settings.screenShakeEnabled) {
+    const wIntensity = 2 + Math.sin(state.multiverseWarningTimer * 0.01) * 2;
+    shakeX += (Math.random() - 0.5) * wIntensity;
+    shakeY += (Math.random() - 0.5) * wIntensity;
+  }
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -828,8 +1261,15 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   const invisibleObs = state.disruptionType === 1 && state.disruptionTimer > 0;
   const noLine = state.disruptionType === 3 && state.disruptionTimer > 0;
 
-  ctx.fillStyle = invertActive ? '#e0e0e0' : theme.bg;
+  // Background
+  const bgColor = state.equippedBackground ? getEquippedBgColor(state.equippedBackground, theme) : (invertActive ? '#e0e0e0' : theme.bg);
+  ctx.fillStyle = bgColor;
   ctx.fillRect(-10, -10, canvasW + 20, canvasH + 20);
+
+  // Equipped background effects
+  if (state.equippedBackground && state.settings.bgAnimEnabled && state.screen === 'playing') {
+    renderEquippedBackground(ctx, state.equippedBackground, canvasW, h);
+  }
 
   if (invertActive && state.disruptionTimer > 2.7) {
     ctx.save(); ctx.globalAlpha = (state.disruptionTimer - 2.7) / 0.3; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvasW, h); ctx.restore();
@@ -837,8 +1277,10 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
 
   if (state.coinFlash > 0) { ctx.save(); ctx.globalAlpha = state.coinFlash * 0.15; ctx.fillStyle = '#facc15'; ctx.fillRect(0, 0, canvasW, h); ctx.restore(); }
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1;
-  for (let x = (frameCount * 2) % 60; x < canvasW; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  if (state.settings.bgAnimEnabled) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1;
+    for (let x = (frameCount * 2) % 60; x < canvasW; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  }
 
   // Tunnel rendering
   if (state.tunnelTimer > 0 && state.screen === 'playing') {
@@ -858,17 +1300,24 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.restore();
   }
 
+  // Floor line
   if (!noLine) {
-    const gaps = state.obstacles.filter(o => o.type === 'gap');
-    const lineColor = invertActive ? '#333' : theme.line;
-    ctx.shadowColor = lineColor; ctx.shadowBlur = 20; ctx.strokeStyle = lineColor; ctx.lineWidth = 2;
-    if (gaps.length > 0) {
-      const sorted = gaps.map(g => ({ left: g.x - (g.gapWidth || 100) / 2, right: g.x + (g.gapWidth || 100) / 2 })).sort((a, b) => a.left - b.left);
-      let cx = 0;
-      for (const gap of sorted) { if (cx < gap.left) { ctx.beginPath(); ctx.moveTo(cx, lineY); ctx.lineTo(gap.left, lineY); ctx.stroke(); } cx = gap.right; }
-      if (cx < canvasW) { ctx.beginPath(); ctx.moveTo(cx, lineY); ctx.lineTo(canvasW, lineY); ctx.stroke(); }
-    } else { ctx.beginPath(); ctx.moveTo(0, lineY); ctx.lineTo(canvasW, lineY); ctx.stroke(); }
-    ctx.shadowBlur = 0;
+    let customFloor = false;
+    if (state.equippedFloor && state.screen === 'playing') {
+      customFloor = renderEquippedFloor(ctx, state.equippedFloor, lineY, canvasW, theme);
+    }
+    if (!customFloor) {
+      const gaps = state.obstacles.filter(o => o.type === 'gap');
+      const lineColor = invertActive ? '#333' : theme.line;
+      ctx.shadowColor = lineColor; ctx.shadowBlur = 20; ctx.strokeStyle = lineColor; ctx.lineWidth = 2;
+      if (gaps.length > 0) {
+        const sorted = gaps.map(g => ({ left: g.x - (g.gapWidth || 100) / 2, right: g.x + (g.gapWidth || 100) / 2 })).sort((a, b) => a.left - b.left);
+        let cx = 0;
+        for (const gap of sorted) { if (cx < gap.left) { ctx.beginPath(); ctx.moveTo(cx, lineY); ctx.lineTo(gap.left, lineY); ctx.stroke(); } cx = gap.right; }
+        if (cx < canvasW) { ctx.beginPath(); ctx.moveTo(cx, lineY); ctx.lineTo(canvasW, lineY); ctx.stroke(); }
+      } else { ctx.beginPath(); ctx.moveTo(0, lineY); ctx.lineTo(canvasW, lineY); ctx.stroke(); }
+      ctx.shadowBlur = 0;
+    }
   }
 
   const skinColor = SKIN_COLORS[state.equippedSkin] || '#00ffcc';
@@ -877,7 +1326,7 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     const breathe = 0.98 + 0.04 * Math.sin((Date.now() / 800) * Math.PI);
     ctx.save(); ctx.translate(canvasW / 2, lineY - PLAYER_SIZE / 2); ctx.scale(breathe, breathe);
     ctx.shadowColor = skinColor; ctx.shadowBlur = 20; ctx.fillStyle = skinColor;
-    ctx.fillRect(-PLAYER_SIZE / 2, -PLAYER_SIZE / 2, PLAYER_SIZE, PLAYER_SIZE);
+    drawPlayerShape(ctx, state.equippedSkin, PLAYER_SIZE, skinColor);
     ctx.restore(); ctx.restore(); return;
   }
 
@@ -903,13 +1352,22 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     }
   }
 
+  // Speed boost visual
+  if (state.speedBoostTimer > 0 && state.screen === 'playing') {
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = '#00ff00';
+    ctx.fillRect(0, 0, canvasW, h);
+    ctx.restore();
+  }
+
   const drawPlayer = (p: Player) => {
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation); ctx.scale(p.squashX, p.squashY);
     if (state.adrenalineActive) { ctx.shadowColor = skinColor; ctx.shadowBlur = 40; }
     else if (state.streak >= 30) { ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 25; }
     else { ctx.shadowColor = skinColor; ctx.shadowBlur = 15; }
     ctx.fillStyle = state.adrenalineActive ? skinColor : (state.streak >= 30 ? '#ffd700' : skinColor);
-    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+    drawPlayerShape(ctx, state.equippedSkin, p.size, skinColor);
     if (state.adrenalineActive) {
       ctx.globalAlpha = 0.3 + 0.2 * Math.sin(Date.now() * 0.01);
       ctx.fillStyle = '#ffffff';
@@ -927,7 +1385,7 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   for (const obs of state.obstacles) {
     if (obs.type === 'intermittent' && !obs.intermittentVisible) { ctx.save(); ctx.globalAlpha = 0.15; ctx.strokeStyle = obsColor; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(obs.x, obs.y, obs.size / 2, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); continue; }
     ctx.save();
-    if (obs.type !== 'gap' && obs.type !== 'ceiling_spikes' && obs.type !== 'pendulum' && obs.type !== 'wall_gap' && obs.type !== 'meteor') {
+    if (obs.type !== 'gap' && obs.type !== 'ceiling_spikes' && obs.type !== 'pendulum' && obs.type !== 'wall_gap' && obs.type !== 'meteor' && obs.type !== 'speed_pad') {
       ctx.save(); ctx.globalAlpha = invisibleObs ? 0.35 : 0.25; ctx.fillStyle = invisibleObs ? 'rgba(0,0,0,0.6)' : obsColor;
       ctx.beginPath(); ctx.ellipse(obs.x, lineY, obs.size / 2 + 4, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     }
@@ -953,13 +1411,10 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
         const gapH = PLAYER_SIZE * 2.5;
         ctx.fillStyle = obsColor;
         if (obs.wallGapPosition === 'bottom') {
-          // Wall on top, gap at bottom (ground level)
           ctx.fillRect(obs.x - ww / 2, 0, ww, lineY - gapH);
         } else {
-          // Wall on bottom, gap at top
           ctx.fillRect(obs.x - ww / 2, lineY - gapH + PLAYER_SIZE * 2, ww, h - lineY + gapH);
         }
-        // Gap indicator
         ctx.save();
         ctx.globalAlpha = 0.3;
         ctx.strokeStyle = theme.line;
@@ -981,7 +1436,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
         ctx.beginPath();
         ctx.arc(obs.x, obs.y, obs.size / 2, 0, Math.PI * 2);
         ctx.fill();
-        // Tail
         ctx.save();
         ctx.globalAlpha = 0.4;
         ctx.beginPath();
@@ -990,6 +1444,70 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
         ctx.lineTo(obs.x + obs.size / 3, obs.y - obs.size / 2);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
+        break;
+      }
+      case 'spinning_blade': {
+        const bladeR = 25;
+        const angle = obs.bladeAngle || 0;
+        const cy = lineY - 15;
+        // Center pivot
+        ctx.fillStyle = obsColor;
+        ctx.beginPath(); ctx.arc(obs.x, cy, 4, 0, Math.PI * 2); ctx.fill();
+        // Blades
+        ctx.strokeStyle = obsColor;
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 12;
+        for (let b = 0; b < 4; b++) {
+          const a = angle + (b * Math.PI / 2);
+          ctx.beginPath();
+          ctx.moveTo(obs.x, cy);
+          ctx.lineTo(obs.x + Math.cos(a) * bladeR, cy + Math.sin(a) * bladeR);
+          ctx.stroke();
+          // Tip
+          ctx.fillStyle = obsColor;
+          ctx.beginPath();
+          ctx.arc(obs.x + Math.cos(a) * bladeR, cy + Math.sin(a) * bladeR, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'fake': {
+        // Looks exactly like a triangle obstacle
+        ctx.fillStyle = obsColor;
+        ctx.globalAlpha = invisibleObs ? 0.05 : 0.8;
+        ctx.beginPath();
+        ctx.moveTo(obs.x, obs.y - half);
+        ctx.lineTo(obs.x + half, obs.y + half);
+        ctx.lineTo(obs.x - half, obs.y + half);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'speed_pad': {
+        ctx.fillStyle = '#00ff44';
+        ctx.shadowColor = '#00ff44';
+        ctx.shadowBlur = 15;
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(obs.x - obs.size / 2, lineY - 3, obs.size, 6);
+        // Arrows
+        ctx.globalAlpha = 0.9;
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('>>>', obs.x, lineY - 6);
+        break;
+      }
+      case 'double_jump': {
+        // Tall wall obstacle
+        ctx.fillStyle = obsColor;
+        ctx.fillRect(obs.x - 12, lineY - obs.size, 24, obs.size);
+        // Warning marks
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('!!', obs.x, lineY - obs.size - 5);
         ctx.restore();
         break;
       }
@@ -1020,37 +1538,48 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
       ctx.save(); ctx.globalAlpha = scale; ctx.fillStyle = QUAD_TINTS[qi]; ctx.fillRect(qd.ox, qd.oy, qw, qh); ctx.restore();
     }
 
-    // Draw mini game views — quadrant 0 uses main obstacles, 1-3 use independent arrays
     for (let qi = 0; qi < 4; qi++) {
       const qd = quadrantDefs[qi];
-      const qObs = qi === 0 ? state.obstacles : (state.multiverseObstacles[qi - 1] || []);
+      // Progressive difficulty: determine which obstacles to show per quadrant
+      let qObs: Obstacle[];
+      if (state.multiverseCount === 1) {
+        // All identical
+        qObs = state.obstacles;
+      } else if (state.multiverseCount === 2) {
+        // Top identical, bottom slightly different
+        qObs = qi < 2 ? state.obstacles : (state.multiverseObstacles[qi - 2] || state.obstacles);
+      } else {
+        // Fully independent
+        qObs = qi === 0 ? state.obstacles : (state.multiverseObstacles[qi - 1] || []);
+      }
+
       ctx.save();
       ctx.globalAlpha = scale * 0.85;
       ctx.beginPath(); ctx.rect(qd.ox, qd.oy, qw, qh); ctx.clip();
       ctx.translate(qd.ox, qd.oy);
       ctx.scale(0.5, 0.5);
-      // Line
       ctx.strokeStyle = QUAD_NEON[qi]; ctx.lineWidth = 2; ctx.shadowColor = QUAD_NEON[qi]; ctx.shadowBlur = 10;
       ctx.beginPath(); ctx.moveTo(0, baseLineY); ctx.lineTo(canvasW, baseLineY); ctx.stroke();
       ctx.shadowBlur = 0;
-      // Obstacles
       for (const obs of qObs) {
         if (obs.type === 'intermittent' && !obs.intermittentVisible) continue;
-        if (obs.type === 'meteor') continue; // Don't show meteors in miniview
+        if (obs.type === 'meteor') continue;
         ctx.fillStyle = QUAD_NEON[qi]; ctx.shadowColor = QUAD_NEON[qi]; ctx.shadowBlur = 6;
         const half2 = obs.size / 2;
         switch (obs.type) {
-          case 'triangle': ctx.beginPath(); ctx.moveTo(obs.x, obs.y - half2); ctx.lineTo(obs.x + half2, obs.y + half2); ctx.lineTo(obs.x - half2, obs.y + half2); ctx.closePath(); ctx.fill(); break;
+          case 'triangle': case 'fake': ctx.beginPath(); ctx.moveTo(obs.x, obs.y - half2); ctx.lineTo(obs.x + half2, obs.y + half2); ctx.lineTo(obs.x - half2, obs.y + half2); ctx.closePath(); ctx.fill(); break;
           case 'circle': ctx.beginPath(); ctx.arc(obs.x, obs.y, half2, 0, Math.PI * 2); ctx.fill(); break;
           case 'diamond': ctx.beginPath(); ctx.moveTo(obs.x, obs.y - half2); ctx.lineTo(obs.x + half2, obs.y); ctx.lineTo(obs.x, obs.y + half2); ctx.lineTo(obs.x - half2, obs.y); ctx.closePath(); ctx.fill(); break;
           case 'spike_row': { const c = obs.spikeCount || 3; const sw = 14; for (let i = 0; i < c; i++) { const sx = obs.x - (c * sw) / 2 + i * sw + sw / 2; ctx.beginPath(); ctx.moveTo(sx - sw / 2, baseLineY); ctx.lineTo(sx, baseLineY - obs.size); ctx.lineTo(sx + sw / 2, baseLineY); ctx.closePath(); ctx.fill(); } break; }
           case 'bouncing_ball': ctx.beginPath(); ctx.arc(obs.x, obs.y, obs.size, 0, Math.PI * 2); ctx.fill(); break;
           case 'wall_gap': { const ww2 = obs.wallWidth || 20; ctx.fillRect(obs.x - ww2 / 2, 0, ww2, baseLineY * 0.7); break; }
+          case 'speed_pad': ctx.fillStyle = '#00ff44'; ctx.fillRect(obs.x - obs.size / 2, baseLineY - 2, obs.size, 4); break;
+          case 'double_jump': ctx.fillRect(obs.x - 10, baseLineY - obs.size, 20, obs.size); break;
+          case 'spinning_blade': { ctx.beginPath(); ctx.arc(obs.x, baseLineY - 15, 15, 0, Math.PI * 2); ctx.stroke(); break; }
           default: ctx.fillRect(obs.x - half2, obs.y - half2, obs.size, obs.size); break;
         }
         ctx.shadowBlur = 0;
       }
-      // Player
       ctx.fillStyle = skinColor; ctx.shadowColor = skinColor; ctx.shadowBlur = 12;
       const ptRef = state.playerTop;
       ctx.fillRect(ptRef.x - ptRef.size / 2, ptRef.y - ptRef.size / 2, ptRef.size, ptRef.size);
@@ -1058,7 +1587,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
       ctx.restore();
     }
 
-    // Neon dividing lines
     ctx.globalAlpha = scale;
     ctx.strokeStyle = '#00ffcc'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 15; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(canvasW / 2, 0); ctx.lineTo(canvasW / 2, h); ctx.stroke();
@@ -1070,6 +1598,21 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
     ctx.fillText('SCORE x2', canvasW / 2, h - 12);
     ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // Multiverse warning text
+  if (state.multiverseWarningTimer > 0 && state.screen === 'playing') {
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.01);
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#ff4400';
+    ctx.shadowColor = '#ff4400';
+    ctx.shadowBlur = 30;
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⚠️ MULTIVERSO ENTRANTE', canvasW / 2, h / 2);
     ctx.restore();
   }
 
@@ -1115,6 +1658,16 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.fillStyle = '#ff6600';
     ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
     ctx.fillText('🚧 TUNNEL — DON\'T JUMP 🚧', canvasW / 2, 50);
+    ctx.restore();
+  }
+
+  // Speed boost indicator
+  if (state.speedBoostTimer > 0 && state.screen === 'playing') {
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = '#00ff44';
+    ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('⚡ SPEED BOOST ⚡', canvasW / 2, 50);
     ctx.restore();
   }
 
@@ -1188,7 +1741,7 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
     ctx.restore();
   }
 
-  if (state.streak >= 10 && state.screen === 'playing') {
+  if (state.streak >= 10 && state.screen === 'playing' && state.settings.showStreak) {
     ctx.save(); ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
     const badge = state.streakMultiplier >= 4 ? 'x4' : state.streakMultiplier >= 3 ? 'x3' : 'x2';
     ctx.fillStyle = state.streakMultiplier >= 4 ? '#ffd700' : state.streakMultiplier >= 3 ? '#ff69b4' : theme.line;
