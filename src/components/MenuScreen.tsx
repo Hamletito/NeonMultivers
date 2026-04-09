@@ -1,20 +1,30 @@
 import { GameState } from '../game/types';
-import { Ghost } from 'lucide-react';
+import { Ghost, Settings, Lock } from 'lucide-react';
 
 interface Props {
   state: GameState;
   onPlay: () => void;
   onShop: () => void;
   onGhostMode: () => void;
+  onChaosMode: () => void;
+  onSettings: () => void;
 }
 
-export default function MenuScreen({ state, onPlay, onShop, onGhostMode }: Props) {
+export default function MenuScreen({ state, onPlay, onShop, onGhostMode, onChaosMode, onSettings }: Props) {
   if (state.screen !== 'menu') return null;
 
   const hasBestRun = state.bestGhostFrames.length > 0;
 
   return (
     <div className="fixed inset-0 z-20 flex flex-col items-center justify-center gap-6 pointer-events-auto">
+      {/* Settings button */}
+      <button
+        onClick={onSettings}
+        className="absolute top-4 right-4 text-foreground/40 hover:text-foreground transition-colors"
+      >
+        <Settings size={24} />
+      </button>
+
       <h1 className="text-5xl font-bold tracking-wider text-primary drop-shadow-[0_0_30px_rgba(0,255,204,0.5)] font-mono">
         NEON RUN
       </h1>
@@ -40,6 +50,23 @@ export default function MenuScreen({ state, onPlay, onShop, onGhostMode }: Props
         >
           <Ghost size={16} />
           {hasBestRun ? '👻 VS GHOST' : '🔒 VS GHOST'}
+        </button>
+        <button
+          onClick={onChaosMode}
+          className={`px-8 py-3 border font-mono text-sm rounded-lg transition-all flex items-center justify-center gap-2 ${
+            state.chaosUnlocked
+              ? 'bg-destructive/20 border-destructive/60 text-destructive hover:bg-destructive/30 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)]'
+              : 'bg-muted/10 border-muted/30 text-muted-foreground hover:border-neon-yellow/40 hover:text-neon-yellow'
+          }`}
+        >
+          {state.chaosUnlocked ? (
+            '🔥 CHAOS MODE'
+          ) : (
+            <>
+              <Lock size={14} />
+              500 🪙 to unlock
+            </>
+          )}
         </button>
         <button
           onClick={onShop}

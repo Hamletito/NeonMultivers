@@ -16,7 +16,7 @@ export interface Player {
 export interface Obstacle {
   x: number;
   y: number;
-  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond' | 'spike_row' | 'bouncing_ball' | 'pendulum' | 'gap' | 'ceiling_spikes' | 'expanding' | 'intermittent' | 'wall_gap' | 'meteor';
+  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond' | 'spike_row' | 'bouncing_ball' | 'pendulum' | 'gap' | 'ceiling_spikes' | 'expanding' | 'intermittent' | 'wall_gap' | 'meteor' | 'spinning_blade' | 'fake' | 'speed_pad' | 'double_jump';
   size: number;
   isTop: boolean;
   bouncePhase?: number;
@@ -36,6 +36,9 @@ export interface Obstacle {
   wallGapPosition?: 'top' | 'bottom';
   wallWidth?: number;
   meteorVy?: number;
+  bladeAngle?: number;
+  isFake?: boolean;
+  speedPadActive?: boolean;
 }
 
 export interface Coin {
@@ -91,8 +94,24 @@ export interface GhostFrame {
   isJumping: boolean;
 }
 
+export interface GameSettings {
+  masterVolume: number;
+  musicEnabled: boolean;
+  sfxEnabled: boolean;
+  particlesEnabled: boolean;
+  screenShakeEnabled: boolean;
+  bgAnimEnabled: boolean;
+  showDistance: boolean;
+  showStreak: boolean;
+  showAdrenaline: boolean;
+  controlSensitivity: 'normal' | 'high';
+  dailyNotifications: boolean;
+  seasonAlerts: boolean;
+  playerName: string;
+}
+
 export interface GameState {
-  screen: 'menu' | 'playing' | 'gameover' | 'shop' | 'paused';
+  screen: 'menu' | 'playing' | 'gameover' | 'shop' | 'paused' | 'settings';
   score: number;
   bestScore: number;
   coins: number;
@@ -114,6 +133,9 @@ export interface GameState {
   equippedSkin: string;
   equippedTrail: string;
   equippedDeath: string;
+  equippedJump: string;
+  equippedBackground: string;
+  equippedFloor: string;
   screenShake: number;
   coinFlash: number;
   streak: number;
@@ -153,6 +175,8 @@ export interface GameState {
   multiverseTextTimer: number;
   multiverseMergeTimer: number;
   multiverseObstacles: Obstacle[][];
+  multiverseCount: number;
+  multiverseWarningTimer: number;
   // Events
   floorWaveTimer: number;
   floorWavePhase: number;
@@ -162,4 +186,12 @@ export interface GameState {
   tunnelTimer: number;
   nextTunnelAt: number;
   tunnelAmount: number;
+  // Speed boost
+  speedBoostTimer: number;
+  speedBoostSlowTimer: number;
+  // Chaos mode
+  chaosMode: boolean;
+  chaosUnlocked: boolean;
+  // Settings
+  settings: GameSettings;
 }

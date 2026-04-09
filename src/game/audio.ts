@@ -6,6 +6,9 @@ let musicPlaying = false;
 let musicGain: GainNode | null = null;
 let musicInterval: number | null = null;
 let currentBPM = 90;
+let masterVolume = 1;
+let sfxEnabled = true;
+let musicEnabled = true;
 
 function getCtx(): AudioContext {
   if (!ctx) ctx = new AudioContext();
@@ -15,21 +18,38 @@ function getCtx(): AudioContext {
 
 export function isMuted() { return muted; }
 
+export function setMasterVolume(v: number) {
+  masterVolume = Math.max(0, Math.min(1, v));
+  if (musicGain) musicGain.gain.value = (muted || !musicEnabled) ? 0 : 0.08 * masterVolume;
+}
+
+export function setSfxEnabled(v: boolean) { sfxEnabled = v; }
+export function setMusicEnabled(v: boolean) {
+  musicEnabled = v;
+  if (musicGain) musicGain.gain.value = (muted || !musicEnabled) ? 0 : 0.08 * masterVolume;
+  if (!v) stopMusic();
+}
+
 export function toggleMute() {
   muted = !muted;
-  if (musicGain) musicGain.gain.value = muted ? 0 : 0.08;
+  if (musicGain) musicGain.gain.value = (muted || !musicEnabled) ? 0 : 0.08 * masterVolume;
   return muted;
 }
 
+function sfxGain(): number {
+  if (muted || !sfxEnabled) return 0;
+  return masterVolume;
+}
+
 export function playJump() {
-  if (muted) return;
+  if (sfxGain() === 0) return;
   const c = getCtx();
   const osc = c.createOscillator();
   const gain = c.createGain();
   osc.type = 'sine';
   osc.frequency.setValueAtTime(300, c.currentTime);
   osc.frequency.linearRampToValueAtTime(600, c.currentTime + 0.15);
-  gain.gain.setValueAtTime(0.12, c.currentTime);
+  gain.gain.setValueAtTime(0.12 * sfxGain(), c.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.15);
   osc.connect(gain).connect(c.destination);
   osc.start(c.currentTime);
@@ -37,14 +57,14 @@ export function playJump() {
 }
 
 export function playLand() {
-  if (muted) return;
+  if (sfxGain() === 0) return;
   const c = getCtx();
   const osc = c.createOscillator();
   const gain = c.createGain();
   osc.type = 'triangle';
   osc.frequency.setValueAtTime(120, c.currentTime);
   osc.frequency.exponentialRampToValueAtTime(40, c.currentTime + 0.08);
-  gain.gain.setValueAtTime(0.15, c.currentTime);
+  gain.gain.setValueAtTime(0.15 * sfxGain(), c.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.08);
   osc.connect(gain).connect(c.destination);
   osc.start(c.currentTime);
@@ -52,7 +72,7 @@ export function playLand() {
 }
 
 export function playCoin() {
-  if (muted) return;
+  if (sfxGain() === 0) return;
   const c = getCtx();
   const osc = c.createOscillator();
   const gain = c.createGain();
@@ -60,7 +80,7 @@ export function playCoin() {
   osc.frequency.setValueAtTime(880, c.currentTime);
   osc.frequency.linearRampToValueAtTime(1760, c.currentTime + 0.05);
   osc.frequency.linearRampToValueAtTime(1320, c.currentTime + 0.1);
-  gain.gain.setValueAtTime(0.1, c.currentTime);
+  gain.gain.setValueAtTime(0.1 * sfxGain(), c.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.1);
   osc.connect(gain).connect(c.destination);
   osc.start(c.currentTime);
@@ -68,14 +88,14 @@ export function playCoin() {
 }
 
 export function playDeath() {
-  if (muted) return;
+  if (sfxGain() === 0) return;
   const c = getCtx();
   const osc = c.createOscillator();
   const gain = c.createGain();
   osc.type = 'sawtooth';
   osc.frequency.setValueAtTime(400, c.currentTime);
   osc.frequency.exponentialRampToValueAtTime(60, c.currentTime + 0.4);
-  gain.gain.setValueAtTime(0.15, c.currentTime);
+  gain.gain.setValueAtTime(0.15 * sfxGain(), c.currentTime);
   gain.gain.linearRampToValueAtTime(0, c.currentTime + 0.4);
   osc.connect(gain).connect(c.destination);
   osc.start(c.currentTime);
@@ -83,7 +103,7 @@ export function playDeath() {
 }
 
 export function playStreakChime(multiplier: number) {
-  if (muted) return;
+  if (sfxGain() === 0) return;
   const c = getCtx();
   const baseFreq = 400 + (multiplier - 2) * 200;
   const notes = [baseFreq, baseFreq * 1.25, baseFreq * 1.5];
@@ -93,7 +113,7 @@ export function playStreakChime(multiplier: number) {
     osc.type = 'sine';
     osc.frequency.value = freq;
     const start = c.currentTime + i * 0.08;
-    gain.gain.setValueAtTime(0.08, start);
+    gain.gain.setValueAtTime(0.08 * sfxGain(), start);
     gain.gain.exponentialRampToValueAtTime(0.001, start + 0.15);
     osc.connect(gain).connect(c.destination);
     osc.start(start);
@@ -102,7 +122,7 @@ export function playStreakChime(multiplier: number) {
 }
 
 export function playWhoosh() {
-  if (muted) return;
+  if (sfxGain() === 0) return;
   const c = getCtx();
   const bufferSize = c.sampleRate * 0.15;
   const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
@@ -117,17 +137,15 @@ export function playWhoosh() {
   filter.frequency.value = 1000;
   filter.Q.value = 0.5;
   const gain = c.createGain();
-  gain.gain.setValueAtTime(0.06, c.currentTime);
+  gain.gain.setValueAtTime(0.06 * sfxGain(), c.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.15);
   source.connect(filter).connect(gain).connect(c.destination);
   source.start(c.currentTime);
 }
 
-
 export function playMultiverseActivate() {
-  if (muted) return;
+  if (sfxGain() === 0) return;
   const c = getCtx();
-  // Dramatic ascending chord
   const freqs = [200, 300, 400, 600];
   freqs.forEach((freq, i) => {
     const osc = c.createOscillator();
@@ -135,7 +153,7 @@ export function playMultiverseActivate() {
     osc.type = 'sine';
     osc.frequency.value = freq;
     const start = c.currentTime + i * 0.05;
-    gain.gain.setValueAtTime(0.08, start);
+    gain.gain.setValueAtTime(0.08 * sfxGain(), start);
     gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
     osc.connect(gain).connect(c.destination);
     osc.start(start);
@@ -143,16 +161,34 @@ export function playMultiverseActivate() {
   });
 }
 
-export function playAdrenalineActivate() {
-  if (muted) return;
+export function playMultiverseWarning() {
+  if (sfxGain() === 0) return;
   const c = getCtx();
-  // Power-up whoosh + ascending tone
+  // Dramatic ascending warning sound over 3 seconds
+  const freqs = [100, 150, 200, 300, 400, 500];
+  freqs.forEach((freq, i) => {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.value = freq;
+    const start = c.currentTime + i * 0.5;
+    gain.gain.setValueAtTime(0.04 * sfxGain(), start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.45);
+    osc.connect(gain).connect(c.destination);
+    osc.start(start);
+    osc.stop(start + 0.45);
+  });
+}
+
+export function playAdrenalineActivate() {
+  if (sfxGain() === 0) return;
+  const c = getCtx();
   const osc = c.createOscillator();
   const gain = c.createGain();
   osc.type = 'sawtooth';
   osc.frequency.setValueAtTime(200, c.currentTime);
   osc.frequency.linearRampToValueAtTime(800, c.currentTime + 0.3);
-  gain.gain.setValueAtTime(0.1, c.currentTime);
+  gain.gain.setValueAtTime(0.1 * sfxGain(), c.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.3);
   osc.connect(gain).connect(c.destination);
   osc.start(c.currentTime);
@@ -161,6 +197,7 @@ export function playAdrenalineActivate() {
 
 // Procedural lofi background music
 export function startMusic(speedMultiplier: number = 1) {
+  if (!musicEnabled) return;
   if (musicPlaying) {
     updateMusicTempo(speedMultiplier);
     return;
@@ -168,7 +205,7 @@ export function startMusic(speedMultiplier: number = 1) {
   musicPlaying = true;
   const c = getCtx();
   musicGain = c.createGain();
-  musicGain.gain.value = muted ? 0 : 0.08;
+  musicGain.gain.value = (muted || !musicEnabled) ? 0 : 0.08 * masterVolume;
   musicGain.connect(c.destination);
 
   currentBPM = 90;
