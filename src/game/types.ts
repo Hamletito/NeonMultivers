@@ -16,7 +16,7 @@ export interface Player {
 export interface Obstacle {
   x: number;
   y: number;
-  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond' | 'spike_row' | 'bouncing_ball' | 'pendulum' | 'gap' | 'ceiling_spikes' | 'expanding' | 'intermittent' | 'wall_gap' | 'meteor' | 'spinning_blade' | 'fake' | 'speed_pad' | 'double_jump';
+  type: 'triangle' | 'circle' | 'star' | 'spike' | 'diamond' | 'spike_row' | 'bouncing_ball' | 'pendulum' | 'gap' | 'ceiling_spikes' | 'expanding' | 'intermittent' | 'wall_gap' | 'meteor' | 'spinning_blade' | 'fake' | 'speed_pad' | 'double_jump' | 'ceiling_spike_trap' | 'rolling_rock' | 'laser_beam' | 'zip_zap' | 'ghost_obstacle' | 'bouncing_mine' | 'shrinking_platform';
   size: number;
   isTop: boolean;
   bouncePhase?: number;
@@ -39,6 +39,15 @@ export interface Obstacle {
   bladeAngle?: number;
   isFake?: boolean;
   speedPadActive?: boolean;
+  // New obstacle properties
+  laserSweepPhase?: number;
+  laserSweepDir?: number;
+  ghostSolid?: boolean;
+  ghostPhase?: number;
+  mineVy?: number;
+  mineVx?: number;
+  shrinkAmount?: number;
+  rockSpeed?: number;
 }
 
 export interface Coin {
@@ -108,6 +117,19 @@ export interface GameSettings {
   dailyNotifications: boolean;
   seasonAlerts: boolean;
   playerName: string;
+}
+
+export interface PlayerProfile {
+  name: string;
+  shape: string;
+  color: string;
+  created: boolean;
+}
+
+export interface SpecialEvent {
+  type: 'floor_wave' | 'gravity_flip' | 'line_rotation' | 'black_white' | 'mirror' | 'matrix_mode' | 'invisible_floor' | 'speed_surge' | 'zoom_out' | 'glitch';
+  timer: number;
+  duration: number;
 }
 
 export interface GameState {
@@ -194,4 +216,16 @@ export interface GameState {
   chaosUnlocked: boolean;
   // Settings
   settings: GameSettings;
+  // Special events
+  specialEvent: SpecialEvent | null;
+  nextSpecialEventAt: number;
+  lastSpecialEventDist: number;
+  // Chaos-specific
+  chaosObstacleStormTimer: number;
+  chaosMirrorFlipTimer: number;
+  chaosSpeedSpikeTimer: number;
+  chaosInvisibleFloorTimer: number;
+  nextChaosEventAt: number;
+  // Chaos bg flicker
+  chaosFlickerTimer: number;
 }
