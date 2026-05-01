@@ -1275,12 +1275,27 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
         qObs = state.obstacles; // All identical in normal mode
       }
 
-      ctx.save(); ctx.globalAlpha = scale * 0.85;
+      ctx.save(); ctx.globalAlpha = scale * 0.95;
       ctx.beginPath(); ctx.rect(qd.ox, qd.oy, qw, qh); ctx.clip();
       ctx.translate(qd.ox, qd.oy); ctx.scale(0.5, 0.5);
-      ctx.strokeStyle = QUAD_NEON[qi]; ctx.lineWidth = 2; ctx.shadowColor = QUAD_NEON[qi]; ctx.shadowBlur = 10;
-      ctx.beginPath(); ctx.moveTo(0, baseLineY); ctx.lineTo(canvasW, baseLineY); ctx.stroke();
+
+      // Equipped background per quadrant (fill bg)
+      if (state.equippedBackground) {
+        const qBg = getEquippedBgColor(state.equippedBackground, theme);
+        ctx.fillStyle = qBg; ctx.fillRect(0, 0, canvasW, h);
+        if (state.settings.bgAnimEnabled) renderEquippedBackground(ctx, state.equippedBackground, canvasW, h);
+      }
+
+      // Equipped floor per quadrant (fallback to neon line)
+      let drewCustomFloor = false;
+      if (state.equippedFloor) drewCustomFloor = renderEquippedFloor(ctx, state.equippedFloor, baseLineY, canvasW, theme);
+      if (!drewCustomFloor) {
+        ctx.strokeStyle = QUAD_NEON[qi]; ctx.lineWidth = 2; ctx.shadowColor = QUAD_NEON[qi]; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.moveTo(0, baseLineY); ctx.lineTo(canvasW, baseLineY); ctx.stroke();
+      }
       ctx.shadowBlur = 0;
+
+      // Obstacles tinted with quadrant color
       for (const obs of qObs) {
         if (obs.type === 'intermittent' && !obs.intermittentVisible) continue;
         if (obs.type === 'meteor' || obs.type === 'ceiling_spike_trap') continue;
@@ -1300,9 +1315,14 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
         }
         ctx.shadowBlur = 0;
       }
-      ctx.fillStyle = skinColor; ctx.shadowColor = skinColor; ctx.shadowBlur = 12;
+
+      // Player with equipped skin shape + color
       const ptRef = state.playerTop;
-      ctx.fillRect(ptRef.x - ptRef.size / 2, ptRef.y - ptRef.size / 2, ptRef.size, ptRef.size);
+      ctx.save();
+      ctx.translate(ptRef.x, ptRef.y);
+      ctx.fillStyle = skinColor; ctx.shadowColor = skinColor; ctx.shadowBlur = 14;
+      drawPlayerShape(ctx, state.equippedSkin, ptRef.size, skinColor);
+      ctx.restore();
       ctx.shadowBlur = 0;
       ctx.restore();
     }
