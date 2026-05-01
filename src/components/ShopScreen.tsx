@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { SHOP_ITEMS } from '../game/constants';
 import { ShopItem } from '../game/types';
-import { ArrowLeft, Lock } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 interface Props {
   coins: number;
