@@ -100,7 +100,7 @@ const Index = () => {
 
   const handleRevive = useCallback(() => {
     setState(s => {
-      const newState = { ...s, screen: 'playing' as const, freeReviveUsed: true, hasShield: true };
+      const newState = { ...s, screen: 'playing' as const, freeReviveUsed: true, hasShield: false, dyingTimer: 0, invincibleTimer: 3000, deathAnim: null };
       newState.obstacles = newState.obstacles.filter(o => o.x > s.playerTop.x + 200);
       return newState;
     });
