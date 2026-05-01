@@ -736,7 +736,8 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
         for (const obs of state.multiverseObstacles[qi]) {
           if (obs.type === 'fake' || obs.type === 'speed_pad') continue;
           if (checkCollision(state.playerTop, obs, baseLineY)) {
-            if (state.hasShield) { state.hasShield = false; state.multiverseObstacles[qi] = state.multiverseObstacles[qi].filter(o => o !== obs); }
+            if (state.invincibleTimer > 0) { state.multiverseObstacles[qi] = state.multiverseObstacles[qi].filter(o => o !== obs); }
+            else if (state.hasShield) { state.hasShield = false; state.multiverseObstacles[qi] = state.multiverseObstacles[qi].filter(o => o !== obs); }
             else { handleDeath(state, state.playerTop, skinColor, baseLineY, obs.type); return state; }
           }
         }
