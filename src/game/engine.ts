@@ -879,8 +879,8 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
-  // Coin spawning — chaos mode 50% more
-  const coinChance = state.chaosMode ? 0.018 : 0.012;
+  // Coin spawning — 60% reduction overall; chaos mode 50% more on top
+  const coinChance = (state.chaosMode ? 0.018 : 0.012) * 0.4;
   if (state.coinItems.length < 2 && Math.random() < coinChance) { const c = spawnSafeCoin(state, canvasW, lineY); if (c) state.coinItems.push(c); }
 
   state.obstacles = state.obstacles.map(o => {
