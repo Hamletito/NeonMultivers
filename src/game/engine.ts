@@ -523,7 +523,27 @@ export function activateAdrenaline(state: GameState): GameState {
 export function update(state: GameState, canvasW: number, canvasH: number, dt: number): GameState {
   if (state.screen !== 'playing') return state;
 
-  const baseLineY = (canvasH - BANNER_HEIGHT) / 2;
+  // Death freeze: play out death anim before transitioning to gameover
+  if (state.dyingTimer > 0) {
+    state.dyingTimer = Math.max(0, state.dyingTimer - dt);
+    // Tick particles only so the death effect animates
+    if (state.settings.particlesEnabled) {
+      state.particles = state.particles.map(p => {
+        const np = { ...p, x: p.x + p.vx, y: p.y + p.vy, life: p.life - 0.02 };
+        if (p.isDeathPiece) { np.vy = (np.vy || 0) + 0.15; if (p.angle !== undefined && p.rotationSpeed) np.angle = p.angle + p.rotationSpeed * 0.016; }
+        return np;
+      }).filter(p => p.life > 0);
+    }
+    if (state.screenShake > 0) state.screenShake = Math.max(0, state.screenShake - dt * 0.005);
+    if (state.dyingTimer <= 0) {
+      (state as any).screen = 'gameover';
+    }
+    return state;
+  }
+
+  // Tick post-revive invincibility
+  if (state.invincibleTimer > 0) state.invincibleTimer = Math.max(0, state.invincibleTimer - dt);
+
   let lineY = baseLineY;
   if (state.floorWaveTimer > 0) lineY = baseLineY + Math.sin(state.floorWavePhase) * 30;
   // Special event: gravity flip adjusts lineY conceptually but we handle it in rendering
