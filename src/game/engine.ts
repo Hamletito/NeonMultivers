@@ -544,6 +544,9 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   // Tick post-revive invincibility
   if (state.invincibleTimer > 0) state.invincibleTimer = Math.max(0, state.invincibleTimer - dt);
 
+  const baseLineY = (canvasH - BANNER_HEIGHT) / 2;
+  let lineY = baseLineY;
+  if (state.floorWaveTimer > 0) lineY = baseLineY + Math.sin(state.floorWavePhase) * 30;
   let lineY = baseLineY;
   if (state.floorWaveTimer > 0) lineY = baseLineY + Math.sin(state.floorWavePhase) * 30;
   // Special event: gravity flip adjusts lineY conceptually but we handle it in rendering
