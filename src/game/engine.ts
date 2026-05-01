@@ -1158,14 +1158,41 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   if (state.speedBoostTimer > 0 && state.screen === 'playing') { ctx.save(); ctx.globalAlpha = 0.2; ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, canvasW, h); ctx.restore(); }
 
   const drawPlayer = (p: Player) => {
+    const isInvincible = state.invincibleTimer > 0;
+    // Rapid flash visibility
+    const flashOn = isInvincible ? (Math.floor(Date.now() / 80) % 2 === 0) : true;
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation); ctx.scale(p.squashX, p.squashY);
     if (state.adrenalineActive) { ctx.shadowColor = skinColor; ctx.shadowBlur = 40; }
     else if (state.streak >= 30) { ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 25; }
     else { ctx.shadowColor = skinColor; ctx.shadowBlur = 15; }
     ctx.fillStyle = state.adrenalineActive ? skinColor : (state.streak >= 30 ? '#ffd700' : skinColor);
+    ctx.globalAlpha = flashOn ? 1 : 0.3;
     drawPlayerShape(ctx, state.equippedSkin, p.size, skinColor);
+    ctx.globalAlpha = 1;
     if (state.adrenalineActive) { ctx.globalAlpha = 0.3 + 0.2 * Math.sin(Date.now() * 0.01); ctx.fillStyle = '#ffffff'; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size); ctx.globalAlpha = 1; }
     if (state.hasShield) { ctx.strokeStyle = 'rgba(0,255,204,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, p.size * 0.8, 0, Math.PI * 2); ctx.stroke(); }
+    if (isInvincible) {
+      // Rotating shield ring matching shape
+      ctx.rotate(Date.now() * 0.005);
+      ctx.strokeStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 12; ctx.lineWidth = 2;
+      const r = p.size * 0.95;
+      const shapeId = state.equippedSkin;
+      ctx.beginPath();
+      if (shapeId === 'shape_circle') { ctx.arc(0, 0, r, 0, Math.PI * 2); }
+      else if (shapeId === 'shape_triangle') { ctx.moveTo(0, -r); ctx.lineTo(r, r * 0.85); ctx.lineTo(-r, r * 0.85); ctx.closePath(); }
+      else if (shapeId === 'shape_star') {
+        let rot = -Math.PI / 2; const step = Math.PI / 5;
+        ctx.moveTo(Math.cos(rot) * r, Math.sin(rot) * r);
+        for (let i = 0; i < 5; i++) { rot += step; ctx.lineTo(Math.cos(rot) * r * 0.45, Math.sin(rot) * r * 0.45); rot += step; ctx.lineTo(Math.cos(rot) * r, Math.sin(rot) * r); }
+        ctx.closePath();
+      } else { ctx.rect(-r, -r, r * 2, r * 2); }
+      ctx.stroke();
+      // Countdown number
+      ctx.rotate(-Date.now() * 0.005);
+      ctx.fillStyle = '#ffd700'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowBlur = 0;
+      ctx.fillText(String(Math.ceil(state.invincibleTimer / 1000)), 0, -p.size - 8);
+    }
     ctx.restore();
   };
   drawPlayer(state.playerTop);
