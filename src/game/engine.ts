@@ -946,12 +946,13 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     
     for (const p of players) {
       if (checkCollision(p, obs, lineY)) {
-        if (state.hasShield) { state.hasShield = false; state.obstacles = state.obstacles.filter(o => o !== obs); addParticles(state.particles, p.x, p.y, '#00ffcc', 15); }
+        if (state.invincibleTimer > 0) { state.obstacles = state.obstacles.filter(o => o !== obs); addParticles(state.particles, p.x, p.y, '#ffffff', 10); }
+        else if (state.hasShield) { state.hasShield = false; state.obstacles = state.obstacles.filter(o => o !== obs); addParticles(state.particles, p.x, p.y, '#00ffcc', 15); }
         else handleDeath(state, p, skinColor, lineY, obs.type);
         break;
       }
     }
-    if ((state as any).screen === 'gameover') break;
+    if (state.dyingTimer > 0) break;
   }
 
   if (state.settings.particlesEnabled) {
