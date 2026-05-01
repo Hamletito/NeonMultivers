@@ -228,4 +228,7 @@ export interface GameState {
   nextChaosEventAt: number;
   // Chaos bg flicker
   chaosFlickerTimer: number;
+  // Death animation gating + post-revive invincibility
+  dyingTimer: number; // ms remaining before transitioning to gameover
+  invincibleTimer: number; // ms remaining of post-revive invincibility
 }
