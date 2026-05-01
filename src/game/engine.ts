@@ -491,15 +491,17 @@ export function resetSpawners() {
 }
 
 function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: number, obsType: Obstacle['type']) {
+  if (state.dyingTimer > 0) return; // already dying
   const deathType = getDeathType(obsType);
   addDeathParticles(state.particles, deathType, p.x, p.y, skinColor, p.size);
   if (state.equippedDeath) addDeathEffect(state.particles, p.x, p.y, skinColor, state.equippedDeath);
   if (state.playerBottom) addParticles(state.particles, state.playerBottom.x, state.playerBottom.y, skinColor, 30);
   state.deathAnim = { type: deathType, timer: 1.5, x: p.x, y: p.y, color: skinColor };
-  state.screenShake = 0;
-  state.screen = 'gameover' as any;
+  state.screenShake = 1.2;
+  // Stay in 'playing' for 1.5s of death animation; gameover triggered by dyingTimer reaching 0
+  state.dyingTimer = 1500;
   state.streak = 0; state.streakMultiplier = 1;
-  const distCoins = Math.floor(state.distance / 10);
+  const distCoins = Math.floor(state.distance / 10 * 0.4); // 60% reduction
   state.coins += distCoins; state.totalCoins += distCoins;
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
