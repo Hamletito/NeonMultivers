@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { SHOP_ITEMS } from '../game/constants';
 import { ShopItem } from '../game/types';
-import { ArrowLeft, Lock } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 interface Props {
   coins: number;
@@ -524,11 +524,7 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
 
                 <p className="text-foreground font-mono text-xs text-center leading-tight">{item.name}</p>
 
-                {isLegendary ? (
-                  <span className="text-yellow-500/70 text-[10px] font-mono flex items-center gap-1">
-                    <Lock size={10} /> Earn in Ranked
-                  </span>
-                ) : equipped ? (
+                {equipped ? (
                   <span className="text-primary text-xs font-mono">EQUIPPED</span>
                 ) : owned ? (
                   <button
@@ -552,7 +548,7 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
                     }}
                     className={`text-xs font-mono px-3 py-1 rounded border transition-all ${
                       coins >= item.price
-                        ? 'bg-neon-yellow/10 text-neon-yellow border-neon-yellow/30 hover:bg-neon-yellow/20'
+                        ? (isLegendary ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/40 hover:bg-yellow-500/20' : 'bg-neon-yellow/10 text-neon-yellow border-neon-yellow/30 hover:bg-neon-yellow/20')
                         : 'bg-muted/10 text-muted-foreground border-muted/30 cursor-not-allowed'
                     }`}
                   >
@@ -563,19 +559,6 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
             );
           })}
         </div>
-
-        {!removeAds && (
-          <div className="mt-6 p-4 bg-card/50 border border-accent rounded-xl flex flex-col items-center gap-2">
-            <p className="text-accent font-mono text-sm font-bold">Remove Ads</p>
-            <p className="text-muted-foreground text-xs font-mono text-center">Enjoy ad-free gameplay</p>
-            <button
-              onClick={onRemoveAds}
-              className="px-4 py-2 bg-accent/20 border border-accent text-accent font-mono text-xs rounded-lg hover:bg-accent/30 transition-all"
-            >
-              PURCHASE — $2.99
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -303,6 +303,7 @@ export function createInitialState(): GameState {
     chaosObstacleStormTimer: 0, chaosMirrorFlipTimer: 0,
     chaosSpeedSpikeTimer: 0, chaosInvisibleFloorTimer: 0,
     nextChaosEventAt: 300, chaosFlickerTimer: 0,
+    dyingTimer: 0, invincibleTimer: 0,
   };
 }
 
@@ -334,6 +335,7 @@ export function resetForNewGame(state: GameState): GameState {
     chaosObstacleStormTimer: 0, chaosMirrorFlipTimer: 0,
     chaosSpeedSpikeTimer: 0, chaosInvisibleFloorTimer: 0,
     nextChaosEventAt: 300, chaosFlickerTimer: 0,
+    dyingTimer: 0, invincibleTimer: 0,
   };
 }
 
@@ -489,15 +491,17 @@ export function resetSpawners() {
 }
 
 function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: number, obsType: Obstacle['type']) {
+  if (state.dyingTimer > 0) return; // already dying
   const deathType = getDeathType(obsType);
   addDeathParticles(state.particles, deathType, p.x, p.y, skinColor, p.size);
   if (state.equippedDeath) addDeathEffect(state.particles, p.x, p.y, skinColor, state.equippedDeath);
   if (state.playerBottom) addParticles(state.particles, state.playerBottom.x, state.playerBottom.y, skinColor, 30);
   state.deathAnim = { type: deathType, timer: 1.5, x: p.x, y: p.y, color: skinColor };
-  state.screenShake = 0;
-  state.screen = 'gameover' as any;
+  state.screenShake = 1.2;
+  // Stay in 'playing' for 1.5s of death animation; gameover triggered by dyingTimer reaching 0
+  state.dyingTimer = 1500;
   state.streak = 0; state.streakMultiplier = 1;
-  const distCoins = Math.floor(state.distance / 10);
+  const distCoins = Math.floor(state.distance / 10 * 0.4); // 60% reduction
   state.coins += distCoins; state.totalCoins += distCoins;
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
@@ -518,6 +522,27 @@ export function activateAdrenaline(state: GameState): GameState {
 
 export function update(state: GameState, canvasW: number, canvasH: number, dt: number): GameState {
   if (state.screen !== 'playing') return state;
+
+  // Death freeze: play out death anim before transitioning to gameover
+  if (state.dyingTimer > 0) {
+    state.dyingTimer = Math.max(0, state.dyingTimer - dt);
+    // Tick particles only so the death effect animates
+    if (state.settings.particlesEnabled) {
+      state.particles = state.particles.map(p => {
+        const np = { ...p, x: p.x + p.vx, y: p.y + p.vy, life: p.life - 0.02 };
+        if (p.isDeathPiece) { np.vy = (np.vy || 0) + 0.15; if (p.angle !== undefined && p.rotationSpeed) np.angle = p.angle + p.rotationSpeed * 0.016; }
+        return np;
+      }).filter(p => p.life > 0);
+    }
+    if (state.screenShake > 0) state.screenShake = Math.max(0, state.screenShake - dt * 0.005);
+    if (state.dyingTimer <= 0) {
+      (state as any).screen = 'gameover';
+    }
+    return state;
+  }
+
+  // Tick post-revive invincibility
+  if (state.invincibleTimer > 0) state.invincibleTimer = Math.max(0, state.invincibleTimer - dt);
 
   const baseLineY = (canvasH - BANNER_HEIGHT) / 2;
   let lineY = baseLineY;
@@ -711,7 +736,8 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
         for (const obs of state.multiverseObstacles[qi]) {
           if (obs.type === 'fake' || obs.type === 'speed_pad') continue;
           if (checkCollision(state.playerTop, obs, baseLineY)) {
-            if (state.hasShield) { state.hasShield = false; state.multiverseObstacles[qi] = state.multiverseObstacles[qi].filter(o => o !== obs); }
+            if (state.invincibleTimer > 0) { state.multiverseObstacles[qi] = state.multiverseObstacles[qi].filter(o => o !== obs); }
+            else if (state.hasShield) { state.hasShield = false; state.multiverseObstacles[qi] = state.multiverseObstacles[qi].filter(o => o !== obs); }
             else { handleDeath(state, state.playerTop, skinColor, baseLineY, obs.type); return state; }
           }
         }
@@ -853,8 +879,8 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     }
   }
 
-  // Coin spawning — chaos mode 50% more
-  const coinChance = state.chaosMode ? 0.018 : 0.012;
+  // Coin spawning — 60% reduction overall; chaos mode 50% more on top
+  const coinChance = (state.chaosMode ? 0.018 : 0.012) * 0.4;
   if (state.coinItems.length < 2 && Math.random() < coinChance) { const c = spawnSafeCoin(state, canvasW, lineY); if (c) state.coinItems.push(c); }
 
   state.obstacles = state.obstacles.map(o => {
@@ -920,12 +946,13 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     
     for (const p of players) {
       if (checkCollision(p, obs, lineY)) {
-        if (state.hasShield) { state.hasShield = false; state.obstacles = state.obstacles.filter(o => o !== obs); addParticles(state.particles, p.x, p.y, '#00ffcc', 15); }
+        if (state.invincibleTimer > 0) { state.obstacles = state.obstacles.filter(o => o !== obs); addParticles(state.particles, p.x, p.y, '#ffffff', 10); }
+        else if (state.hasShield) { state.hasShield = false; state.obstacles = state.obstacles.filter(o => o !== obs); addParticles(state.particles, p.x, p.y, '#00ffcc', 15); }
         else handleDeath(state, p, skinColor, lineY, obs.type);
         break;
       }
     }
-    if ((state as any).screen === 'gameover') break;
+    if (state.dyingTimer > 0) break;
   }
 
   if (state.settings.particlesEnabled) {
@@ -1131,14 +1158,41 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
   if (state.speedBoostTimer > 0 && state.screen === 'playing') { ctx.save(); ctx.globalAlpha = 0.2; ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, canvasW, h); ctx.restore(); }
 
   const drawPlayer = (p: Player) => {
+    const isInvincible = state.invincibleTimer > 0;
+    // Rapid flash visibility
+    const flashOn = isInvincible ? (Math.floor(Date.now() / 80) % 2 === 0) : true;
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation); ctx.scale(p.squashX, p.squashY);
     if (state.adrenalineActive) { ctx.shadowColor = skinColor; ctx.shadowBlur = 40; }
     else if (state.streak >= 30) { ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 25; }
     else { ctx.shadowColor = skinColor; ctx.shadowBlur = 15; }
     ctx.fillStyle = state.adrenalineActive ? skinColor : (state.streak >= 30 ? '#ffd700' : skinColor);
+    ctx.globalAlpha = flashOn ? 1 : 0.3;
     drawPlayerShape(ctx, state.equippedSkin, p.size, skinColor);
+    ctx.globalAlpha = 1;
     if (state.adrenalineActive) { ctx.globalAlpha = 0.3 + 0.2 * Math.sin(Date.now() * 0.01); ctx.fillStyle = '#ffffff'; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size); ctx.globalAlpha = 1; }
     if (state.hasShield) { ctx.strokeStyle = 'rgba(0,255,204,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, p.size * 0.8, 0, Math.PI * 2); ctx.stroke(); }
+    if (isInvincible) {
+      // Rotating shield ring matching shape
+      ctx.rotate(Date.now() * 0.005);
+      ctx.strokeStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 12; ctx.lineWidth = 2;
+      const r = p.size * 0.95;
+      const shapeId = state.equippedSkin;
+      ctx.beginPath();
+      if (shapeId === 'shape_circle') { ctx.arc(0, 0, r, 0, Math.PI * 2); }
+      else if (shapeId === 'shape_triangle') { ctx.moveTo(0, -r); ctx.lineTo(r, r * 0.85); ctx.lineTo(-r, r * 0.85); ctx.closePath(); }
+      else if (shapeId === 'shape_star') {
+        let rot = -Math.PI / 2; const step = Math.PI / 5;
+        ctx.moveTo(Math.cos(rot) * r, Math.sin(rot) * r);
+        for (let i = 0; i < 5; i++) { rot += step; ctx.lineTo(Math.cos(rot) * r * 0.45, Math.sin(rot) * r * 0.45); rot += step; ctx.lineTo(Math.cos(rot) * r, Math.sin(rot) * r); }
+        ctx.closePath();
+      } else { ctx.rect(-r, -r, r * 2, r * 2); }
+      ctx.stroke();
+      // Countdown number
+      ctx.rotate(-Date.now() * 0.005);
+      ctx.fillStyle = '#ffd700'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowBlur = 0;
+      ctx.fillText(String(Math.ceil(state.invincibleTimer / 1000)), 0, -p.size - 8);
+    }
     ctx.restore();
   };
   drawPlayer(state.playerTop);
@@ -1221,12 +1275,27 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
         qObs = state.obstacles; // All identical in normal mode
       }
 
-      ctx.save(); ctx.globalAlpha = scale * 0.85;
+      ctx.save(); ctx.globalAlpha = scale * 0.95;
       ctx.beginPath(); ctx.rect(qd.ox, qd.oy, qw, qh); ctx.clip();
       ctx.translate(qd.ox, qd.oy); ctx.scale(0.5, 0.5);
-      ctx.strokeStyle = QUAD_NEON[qi]; ctx.lineWidth = 2; ctx.shadowColor = QUAD_NEON[qi]; ctx.shadowBlur = 10;
-      ctx.beginPath(); ctx.moveTo(0, baseLineY); ctx.lineTo(canvasW, baseLineY); ctx.stroke();
+
+      // Equipped background per quadrant (fill bg)
+      if (state.equippedBackground) {
+        const qBg = getEquippedBgColor(state.equippedBackground, theme);
+        ctx.fillStyle = qBg; ctx.fillRect(0, 0, canvasW, h);
+        if (state.settings.bgAnimEnabled) renderEquippedBackground(ctx, state.equippedBackground, canvasW, h);
+      }
+
+      // Equipped floor per quadrant (fallback to neon line)
+      let drewCustomFloor = false;
+      if (state.equippedFloor) drewCustomFloor = renderEquippedFloor(ctx, state.equippedFloor, baseLineY, canvasW, theme);
+      if (!drewCustomFloor) {
+        ctx.strokeStyle = QUAD_NEON[qi]; ctx.lineWidth = 2; ctx.shadowColor = QUAD_NEON[qi]; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.moveTo(0, baseLineY); ctx.lineTo(canvasW, baseLineY); ctx.stroke();
+      }
       ctx.shadowBlur = 0;
+
+      // Obstacles tinted with quadrant color
       for (const obs of qObs) {
         if (obs.type === 'intermittent' && !obs.intermittentVisible) continue;
         if (obs.type === 'meteor' || obs.type === 'ceiling_spike_trap') continue;
@@ -1246,9 +1315,14 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, canvasW:
         }
         ctx.shadowBlur = 0;
       }
-      ctx.fillStyle = skinColor; ctx.shadowColor = skinColor; ctx.shadowBlur = 12;
+
+      // Player with equipped skin shape + color
       const ptRef = state.playerTop;
-      ctx.fillRect(ptRef.x - ptRef.size / 2, ptRef.y - ptRef.size / 2, ptRef.size, ptRef.size);
+      ctx.save();
+      ctx.translate(ptRef.x, ptRef.y);
+      ctx.fillStyle = skinColor; ctx.shadowColor = skinColor; ctx.shadowBlur = 14;
+      drawPlayerShape(ctx, state.equippedSkin, ptRef.size, skinColor);
+      ctx.restore();
       ctx.shadowBlur = 0;
       ctx.restore();
     }

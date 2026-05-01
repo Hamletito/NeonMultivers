@@ -35,70 +35,70 @@ export const SKIN_COLORS: Record<string, string> = {
 
 export const SHOP_ITEMS: ShopItem[] = [
   // === SKINS ===
-  // Common
+  // Common — 300
   { id: 'default', name: 'Neon Cyan', price: 0, type: 'skin', rarity: 'common', color: '#00ffcc', owned: true, equipped: true },
-  { id: 'pink', name: 'Hot Pink', price: 100, type: 'skin', rarity: 'common', color: '#ff69b4', owned: false },
-  { id: 'purple', name: 'Purple Rain', price: 100, type: 'skin', rarity: 'common', color: '#a855f7', owned: false },
-  { id: 'coral', name: 'Coral', price: 100, type: 'skin', rarity: 'common', color: '#ff7f7f', owned: false },
-  { id: 'mint', name: 'Mint', price: 100, type: 'skin', rarity: 'common', color: '#98ffc8', owned: false },
-  { id: 'lavender', name: 'Lavender', price: 100, type: 'skin', rarity: 'common', color: '#c4b5fd', owned: false },
-  { id: 'skyblue', name: 'Sky Blue', price: 100, type: 'skin', rarity: 'common', color: '#7dd3fc', owned: false },
-  { id: 'lime', name: 'Lime', price: 100, type: 'skin', rarity: 'common', color: '#a3e635', owned: false },
-  // Rare
-  { id: 'yellow', name: 'Golden', price: 200, type: 'skin', rarity: 'rare', color: '#facc15', owned: false },
-  { id: 'orange', name: 'Blaze', price: 200, type: 'skin', rarity: 'rare', color: '#fb923c', owned: false },
-  { id: 'red', name: 'Crimson', price: 200, type: 'skin', rarity: 'rare', color: '#ef4444', owned: false },
-  { id: 'blue', name: 'Ocean', price: 200, type: 'skin', rarity: 'rare', color: '#3b82f6', owned: false },
-  { id: 'galaxy', name: 'Galaxy', price: 200, type: 'skin', rarity: 'rare', color: '#4c1d95', owned: false },
-  { id: 'lava', name: 'Lava', price: 200, type: 'skin', rarity: 'rare', color: '#dc2626', owned: false },
-  { id: 'arctic', name: 'Arctic', price: 200, type: 'skin', rarity: 'rare', color: '#bae6fd', owned: false },
-  // Epic
-  { id: 'white', name: 'Ghost', price: 350, type: 'skin', rarity: 'epic', color: '#ffffff', owned: false },
-  { id: 'shape_circle', name: 'Circle Shape', price: 350, type: 'skin', rarity: 'epic', color: '#00ffcc', owned: false },
-  { id: 'shape_triangle', name: 'Triangle Shape', price: 350, type: 'skin', rarity: 'epic', color: '#00ffcc', owned: false },
-  { id: 'shape_star', name: 'Star Shape', price: 350, type: 'skin', rarity: 'epic', color: '#00ffcc', owned: false },
-  // Legendary
-  { id: 'phantom', name: 'Phantom', price: 0, type: 'skin', rarity: 'legendary', color: '#00ffcc', owned: false },
-  { id: 'nova', name: 'Nova', price: 0, type: 'skin', rarity: 'legendary', color: '#ffd700', owned: false },
-  { id: 'prism', name: 'Prism', price: 0, type: 'skin', rarity: 'legendary', color: '#ff00ff', owned: false },
+  { id: 'pink', name: 'Hot Pink', price: 300, type: 'skin', rarity: 'common', color: '#ff69b4', owned: false },
+  { id: 'purple', name: 'Purple Rain', price: 300, type: 'skin', rarity: 'common', color: '#a855f7', owned: false },
+  { id: 'coral', name: 'Coral', price: 300, type: 'skin', rarity: 'common', color: '#ff7f7f', owned: false },
+  { id: 'mint', name: 'Mint', price: 300, type: 'skin', rarity: 'common', color: '#98ffc8', owned: false },
+  { id: 'lavender', name: 'Lavender', price: 300, type: 'skin', rarity: 'common', color: '#c4b5fd', owned: false },
+  { id: 'skyblue', name: 'Sky Blue', price: 300, type: 'skin', rarity: 'common', color: '#7dd3fc', owned: false },
+  { id: 'lime', name: 'Lime', price: 300, type: 'skin', rarity: 'common', color: '#a3e635', owned: false },
+  // Rare — 600
+  { id: 'yellow', name: 'Golden', price: 600, type: 'skin', rarity: 'rare', color: '#facc15', owned: false },
+  { id: 'orange', name: 'Blaze', price: 600, type: 'skin', rarity: 'rare', color: '#fb923c', owned: false },
+  { id: 'red', name: 'Crimson', price: 600, type: 'skin', rarity: 'rare', color: '#ef4444', owned: false },
+  { id: 'blue', name: 'Ocean', price: 600, type: 'skin', rarity: 'rare', color: '#3b82f6', owned: false },
+  { id: 'galaxy', name: 'Galaxy', price: 600, type: 'skin', rarity: 'rare', color: '#4c1d95', owned: false },
+  { id: 'lava', name: 'Lava', price: 600, type: 'skin', rarity: 'rare', color: '#dc2626', owned: false },
+  { id: 'arctic', name: 'Arctic', price: 600, type: 'skin', rarity: 'rare', color: '#bae6fd', owned: false },
+  // Epic — 1050
+  { id: 'white', name: 'Ghost', price: 1050, type: 'skin', rarity: 'epic', color: '#ffffff', owned: false },
+  { id: 'shape_circle', name: 'Circle Shape', price: 1050, type: 'skin', rarity: 'epic', color: '#00ffcc', owned: false },
+  { id: 'shape_triangle', name: 'Triangle Shape', price: 1050, type: 'skin', rarity: 'epic', color: '#00ffcc', owned: false },
+  { id: 'shape_star', name: 'Star Shape', price: 1050, type: 'skin', rarity: 'epic', color: '#00ffcc', owned: false },
+  // Legendary — 5000 (now purchasable)
+  { id: 'phantom', name: 'Phantom', price: 5000, type: 'skin', rarity: 'legendary', color: '#00ffcc', owned: false },
+  { id: 'nova', name: 'Nova', price: 5000, type: 'skin', rarity: 'legendary', color: '#ffd700', owned: false },
+  { id: 'prism', name: 'Prism', price: 5000, type: 'skin', rarity: 'legendary', color: '#ff00ff', owned: false },
 
   // === TRAILS ===
-  { id: 'trail_fire', name: 'Fire Trail', price: 150, type: 'trail', rarity: 'common', owned: false },
-  { id: 'trail_ice', name: 'Ice Trail', price: 150, type: 'trail', rarity: 'common', owned: false },
-  { id: 'trail_smoke', name: 'Smoke Trail', price: 150, type: 'trail', rarity: 'common', owned: false },
-  { id: 'trail_electric', name: 'Electric Trail', price: 200, type: 'trail', rarity: 'rare', owned: false },
-  { id: 'trail_bubble', name: 'Bubble Trail', price: 200, type: 'trail', rarity: 'rare', owned: false },
-  { id: 'trail_star', name: 'Star Trail', price: 250, type: 'trail', rarity: 'rare', owned: false },
+  { id: 'trail_fire', name: 'Fire Trail', price: 450, type: 'trail', rarity: 'common', owned: false },
+  { id: 'trail_ice', name: 'Ice Trail', price: 450, type: 'trail', rarity: 'common', owned: false },
+  { id: 'trail_smoke', name: 'Smoke Trail', price: 450, type: 'trail', rarity: 'common', owned: false },
+  { id: 'trail_electric', name: 'Electric Trail', price: 600, type: 'trail', rarity: 'rare', owned: false },
+  { id: 'trail_bubble', name: 'Bubble Trail', price: 600, type: 'trail', rarity: 'rare', owned: false },
+  { id: 'trail_star', name: 'Star Trail', price: 750, type: 'trail', rarity: 'rare', owned: false },
 
   // === DEATH EFFECTS ===
-  { id: 'death_confetti', name: 'Confetti Burst', price: 150, type: 'death', rarity: 'common', owned: false },
-  { id: 'death_nuclear', name: 'Nuclear Explosion', price: 200, type: 'death', rarity: 'rare', owned: false },
-  { id: 'death_diamond', name: 'Diamond Particles', price: 300, type: 'death', rarity: 'epic', owned: false },
-  { id: 'death_firerain', name: 'Fire Rain', price: 300, type: 'death', rarity: 'epic', owned: false },
+  { id: 'death_confetti', name: 'Confetti Burst', price: 450, type: 'death', rarity: 'common', owned: false },
+  { id: 'death_nuclear', name: 'Nuclear Explosion', price: 600, type: 'death', rarity: 'rare', owned: false },
+  { id: 'death_diamond', name: 'Diamond Particles', price: 900, type: 'death', rarity: 'epic', owned: false },
+  { id: 'death_firerain', name: 'Fire Rain', price: 900, type: 'death', rarity: 'epic', owned: false },
 
   // === JUMP EFFECTS ===
-  { id: 'jump_rings', name: 'Energy Rings', price: 150, type: 'jump', rarity: 'common', owned: false },
-  { id: 'jump_cloud', name: 'Cloud Puff', price: 150, type: 'jump', rarity: 'common', owned: false },
-  { id: 'jump_spark', name: 'Spark Burst', price: 200, type: 'jump', rarity: 'rare', owned: false },
-  { id: 'jump_shockwave', name: 'Shockwave', price: 250, type: 'jump', rarity: 'rare', owned: false },
+  { id: 'jump_rings', name: 'Energy Rings', price: 450, type: 'jump', rarity: 'common', owned: false },
+  { id: 'jump_cloud', name: 'Cloud Puff', price: 450, type: 'jump', rarity: 'common', owned: false },
+  { id: 'jump_spark', name: 'Spark Burst', price: 600, type: 'jump', rarity: 'rare', owned: false },
+  { id: 'jump_shockwave', name: 'Shockwave', price: 750, type: 'jump', rarity: 'rare', owned: false },
 
   // === BACKGROUNDS ===
-  { id: 'bg_stars', name: 'Moving Stars', price: 200, type: 'background', rarity: 'rare', owned: false },
-  { id: 'bg_matrix', name: 'Matrix Rain', price: 300, type: 'background', rarity: 'epic', owned: false },
-  { id: 'bg_galaxy', name: 'Galaxy Drift', price: 300, type: 'background', rarity: 'epic', owned: false },
-  { id: 'bg_cyberpunk', name: 'Cyberpunk City', price: 350, type: 'background', rarity: 'epic', owned: false },
+  { id: 'bg_stars', name: 'Moving Stars', price: 600, type: 'background', rarity: 'rare', owned: false },
+  { id: 'bg_matrix', name: 'Matrix Rain', price: 900, type: 'background', rarity: 'epic', owned: false },
+  { id: 'bg_galaxy', name: 'Galaxy Drift', price: 900, type: 'background', rarity: 'epic', owned: false },
+  { id: 'bg_cyberpunk', name: 'Cyberpunk City', price: 1050, type: 'background', rarity: 'epic', owned: false },
 
   // === FLOOR EFFECTS ===
-  { id: 'floor_electric', name: 'Electric Line', price: 200, type: 'floor', rarity: 'rare', owned: false },
-  { id: 'floor_fire', name: 'Fire Line', price: 200, type: 'floor', rarity: 'rare', owned: false },
-  { id: 'floor_ice', name: 'Ice Line', price: 200, type: 'floor', rarity: 'rare', owned: false },
-  { id: 'floor_rainbow', name: 'Rainbow Line', price: 300, type: 'floor', rarity: 'epic', owned: false },
+  { id: 'floor_electric', name: 'Electric Line', price: 600, type: 'floor', rarity: 'rare', owned: false },
+  { id: 'floor_fire', name: 'Fire Line', price: 600, type: 'floor', rarity: 'rare', owned: false },
+  { id: 'floor_ice', name: 'Ice Line', price: 600, type: 'floor', rarity: 'rare', owned: false },
+  { id: 'floor_rainbow', name: 'Rainbow Line', price: 900, type: 'floor', rarity: 'epic', owned: false },
 
   // === POWER-UPS ===
   { id: 'powerup_shield', name: 'Shield', price: 50, type: 'powerup', rarity: 'common', owned: true },
   { id: 'powerup_slowmo', name: 'Slow Motion', price: 75, type: 'powerup', rarity: 'common', owned: true },
   { id: 'powerup_magnet', name: 'Coin Magnet', price: 60, type: 'powerup', rarity: 'common', owned: true },
-  { id: 'powerup_goldshield', name: 'Golden Shield', price: 400, type: 'powerup', rarity: 'epic', owned: false },
-  { id: 'powerup_extremeslowmo', name: 'Extreme Slow-Mo', price: 350, type: 'powerup', rarity: 'epic', owned: false },
-  { id: 'powerup_megamagnet', name: 'Mega Magnet', price: 400, type: 'powerup', rarity: 'epic', owned: false },
+  { id: 'powerup_goldshield', name: 'Golden Shield', price: 1200, type: 'powerup', rarity: 'epic', owned: false },
+  { id: 'powerup_extremeslowmo', name: 'Extreme Slow-Mo', price: 1050, type: 'powerup', rarity: 'epic', owned: false },
+  { id: 'powerup_megamagnet', name: 'Mega Magnet', price: 1200, type: 'powerup', rarity: 'epic', owned: false },
 ];

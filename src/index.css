@@ -64,3 +64,36 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile landscape rotation prompt */
+.rotate-prompt { display: none; }
+@media (max-width: 900px) and (orientation: portrait) {
+  .rotate-prompt {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    padding: 2rem;
+    text-align: center;
+    gap: 1rem;
+  }
+  .rotate-prompt .icon {
+    font-size: 4rem;
+    animation: rotate-hint 2s ease-in-out infinite;
+  }
+  .rotate-app-content { display: none !important; }
+}
+@keyframes rotate-hint {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
+}
+
+/* Hide scrollbars */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+

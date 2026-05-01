@@ -100,7 +100,7 @@ const Index = () => {
 
   const handleRevive = useCallback(() => {
     setState(s => {
-      const newState = { ...s, screen: 'playing' as const, freeReviveUsed: true, hasShield: true };
+      const newState = { ...s, screen: 'playing' as const, freeReviveUsed: true, hasShield: false, dyingTimer: 0, invincibleTimer: 3000, deathAnim: null };
       newState.obstacles = newState.obstacles.filter(o => o.x > s.playerTop.x + 200);
       return newState;
     });
@@ -144,31 +144,45 @@ const Index = () => {
 
   if (needsProfile) {
     return (
-      <div className="w-full h-screen overflow-hidden bg-background">
-        <ProfileScreen onComplete={handleProfileComplete} />
-      </div>
+      <>
+        <div className="rotate-prompt">
+          <div className="icon">📱</div>
+          <p className="font-mono text-lg text-primary">Rotate your device</p>
+          <p className="font-mono text-xs text-muted-foreground">Neon Run is best played in landscape</p>
+        </div>
+        <div className="w-full h-screen overflow-hidden bg-background rotate-app-content">
+          <ProfileScreen onComplete={handleProfileComplete} />
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="w-full h-screen overflow-hidden bg-background">
-      <GameCanvas state={state} onStateChange={setState} />
-      {showTutorial && <TutorialOverlay onComplete={handleTutorialComplete} />}
-      <MenuScreen state={state} onPlay={handlePlay} onShop={handleShop} onGhostMode={handleGhostMode} onChaosMode={handleChaosMode} onSettings={handleSettings} profile={profile} />
-      <HUD state={state} onPause={handlePause} onActivatePower={handleActivatePower} onAdrenaline={handleAdrenaline} onSettings={handleSettings} />
-      <GameOverScreen state={state} onRevive={handleRevive} onMenu={handleMenu} />
-      <PauseOverlay visible={state.screen === 'paused' && !showInGameSettings} onResume={handleResume} onMenu={handleMenu} />
-      {showInGameSettings && (
-        <InGameSettings settings={state.settings} onUpdate={handleUpdateSettings} onClose={handleCloseInGameSettings} />
-      )}
-      {state.screen === 'shop' && (
-        <ShopScreen coins={state.totalCoins} removeAds={state.removeAds} equippedSkin={state.equippedSkin} equippedTrail={state.equippedTrail} equippedDeath={state.equippedDeath} equippedJump={state.equippedJump} equippedBackground={state.equippedBackground} equippedFloor={state.equippedFloor} onBuy={handleBuy} onEquip={handleEquip} onRemoveAds={handleRemoveAds} onBack={handleMenu} />
-      )}
-      {state.screen === 'settings' && (
-        <SettingsScreen settings={state.settings} onUpdate={handleUpdateSettings} onBack={handleMenu} />
-      )}
-      <div id="banner-ad" className="fixed bottom-0 left-0 right-0 h-[60px] z-10" />
-    </div>
+    <>
+      <div className="rotate-prompt">
+        <div className="icon">📱</div>
+        <p className="font-mono text-lg text-primary">Rotate your device</p>
+        <p className="font-mono text-xs text-muted-foreground">Neon Run is best played in landscape</p>
+      </div>
+      <div className="w-full h-screen overflow-hidden bg-background rotate-app-content">
+        <GameCanvas state={state} onStateChange={setState} />
+        {showTutorial && <TutorialOverlay onComplete={handleTutorialComplete} />}
+        <MenuScreen state={state} onPlay={handlePlay} onShop={handleShop} onGhostMode={handleGhostMode} onChaosMode={handleChaosMode} onSettings={handleSettings} profile={profile} />
+        <HUD state={state} onPause={handlePause} onActivatePower={handleActivatePower} onAdrenaline={handleAdrenaline} onSettings={handleSettings} />
+        <GameOverScreen state={state} onRevive={handleRevive} onMenu={handleMenu} />
+        <PauseOverlay visible={state.screen === 'paused' && !showInGameSettings} onResume={handleResume} onMenu={handleMenu} />
+        {showInGameSettings && (
+          <InGameSettings settings={state.settings} onUpdate={handleUpdateSettings} onClose={handleCloseInGameSettings} />
+        )}
+        {state.screen === 'shop' && (
+          <ShopScreen coins={state.totalCoins} removeAds={state.removeAds} equippedSkin={state.equippedSkin} equippedTrail={state.equippedTrail} equippedDeath={state.equippedDeath} equippedJump={state.equippedJump} equippedBackground={state.equippedBackground} equippedFloor={state.equippedFloor} onBuy={handleBuy} onEquip={handleEquip} onRemoveAds={handleRemoveAds} onBack={handleMenu} />
+        )}
+        {state.screen === 'settings' && (
+          <SettingsScreen settings={state.settings} onUpdate={handleUpdateSettings} onBack={handleMenu} />
+        )}
+        <div id="banner-ad" className="fixed bottom-0 left-0 right-0 h-[60px] z-10" />
+      </div>
+    </>
   );
 };
 
