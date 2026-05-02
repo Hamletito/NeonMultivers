@@ -9,6 +9,7 @@ import SettingsScreen from '../components/SettingsScreen';
 import ProfileScreen from '../components/ProfileScreen';
 import TutorialOverlay from '../components/TutorialOverlay';
 import InGameSettings from '../components/InGameSettings';
+import AchievementsScreen from '../components/AchievementsScreen';
 import { GameState, ShopItem, GameSettings, PlayerProfile } from '../game/types';
 import { createInitialState, resetForNewGame, activateAdrenaline } from '../game/engine';
 import { toggleMute, isMuted, startMusic, stopMusic, setMasterVolume, setSfxEnabled, setMusicEnabled } from '../game/audio';

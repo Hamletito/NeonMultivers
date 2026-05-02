@@ -8,10 +8,11 @@ interface Props {
   onGhostMode: () => void;
   onChaosMode: () => void;
   onSettings: () => void;
+  onAchievements: () => void;
   profile?: PlayerProfile | null;
 }
 
-export default function MenuScreen({ state, onPlay, onShop, onGhostMode, onChaosMode, onSettings, profile }: Props) {
+export default function MenuScreen({ state, onPlay, onShop, onGhostMode, onChaosMode, onSettings, onAchievements, profile }: Props) {
   if (state.screen !== 'menu') return null;
 
   const hasBestRun = state.bestGhostFrames.length > 0;
@@ -57,6 +58,9 @@ export default function MenuScreen({ state, onPlay, onShop, onGhostMode, onChaos
         </button>
         <button onClick={onShop} className="px-8 py-3 bg-secondary/20 border border-secondary text-secondary font-mono text-lg rounded-lg hover:bg-secondary/30 transition-all">
           SHOP
+        </button>
+        <button onClick={onAchievements} className="px-8 py-3 bg-yellow-400/10 border border-yellow-400/60 text-yellow-400 font-mono text-sm rounded-lg hover:bg-yellow-400/20 transition-all">
+          🏆 ACHIEVEMENTS
         </button>
       </div>
       {!hasBestRun && <p className="text-muted-foreground/50 text-[10px] font-mono">Play a run first to unlock Ghost Mode</p>}
