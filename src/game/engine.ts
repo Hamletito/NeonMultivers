@@ -500,6 +500,7 @@ function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: num
   state.screenShake = 1.2;
   // Stay in 'playing' for 1.5s of death animation; gameover triggered by dyingTimer reaching 0
   state.dyingTimer = 1500;
+  const finalStreak = state.streak;
   state.streak = 0; state.streakMultiplier = 1;
   const distCoins = Math.floor(state.distance / 10 * 0.4); // 60% reduction
   state.coins += distCoins; state.totalCoins += distCoins;
@@ -518,7 +519,7 @@ function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: num
     const totalDist = parseInt(localStorage.getItem('achTotalDistance') || '0', 10) + Math.floor(state.distance);
     localStorage.setItem('achTotalDistance', String(totalDist));
     const bestStreak = parseInt(localStorage.getItem('bestStreak') || '0', 10);
-    if (state.streak > bestStreak) localStorage.setItem('bestStreak', String(state.streak));
+    if (finalStreak > bestStreak) localStorage.setItem('bestStreak', String(finalStreak));
     const runs = parseInt(localStorage.getItem('neonRunCount') || '0', 10) + 1;
     localStorage.setItem('neonRunCount', String(runs));
   } catch {}
