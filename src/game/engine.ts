@@ -761,6 +761,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if (state.multiverseTimer <= 0) {
       state.multiverseActive = false;
       state.multiverseMergeTimer = 500;
+      try { const ms = parseInt(localStorage.getItem('achMultiverseSurvived') || '0', 10) + 1; localStorage.setItem('achMultiverseSurvived', String(ms)); } catch {}
       const nextDist = state.chaosMode ? (state.distance + 200 + Math.random() * 200) : (state.distance + 300 + Math.random() * 300);
       state.nextMultiverseAt = nextDist;
       state.multiverseObstacles = [[], [], []];
