@@ -28,6 +28,7 @@ const Index = () => {
   const [profile, setProfile] = useState<PlayerProfile | null>(loadProfile);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showInGameSettings, setShowInGameSettings] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
 
   const needsProfile = !profile?.created;
   const needsTutorial = profile?.created && localStorage.getItem('tutorialDone') !== 'true';
@@ -168,7 +169,10 @@ const Index = () => {
       <div className="w-full h-screen overflow-hidden bg-background rotate-app-content">
         <GameCanvas state={state} onStateChange={setState} />
         {showTutorial && <TutorialOverlay onComplete={handleTutorialComplete} />}
-        <MenuScreen state={state} onPlay={handlePlay} onShop={handleShop} onGhostMode={handleGhostMode} onChaosMode={handleChaosMode} onSettings={handleSettings} profile={profile} />
+        <MenuScreen state={state} onPlay={handlePlay} onShop={handleShop} onGhostMode={handleGhostMode} onChaosMode={handleChaosMode} onSettings={handleSettings} onAchievements={() => setShowAchievements(true)} profile={profile} />
+        {showAchievements && (
+          <AchievementsScreen onBack={() => setShowAchievements(false)} onCoinsUpdate={(c) => setState(s => ({ ...s, coins: c, totalCoins: c }))} />
+        )}
         <HUD state={state} onPause={handlePause} onActivatePower={handleActivatePower} onAdrenaline={handleAdrenaline} onSettings={handleSettings} />
         <GameOverScreen state={state} onRevive={handleRevive} onMenu={handleMenu} />
         <PauseOverlay visible={state.screen === 'paused' && !showInGameSettings} onResume={handleResume} onMenu={handleMenu} />
