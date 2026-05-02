@@ -509,6 +509,19 @@ function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: num
     saveBestGhost(state.ghostFrames);
   }
   localStorage.setItem('coins', String(state.totalCoins));
+  // Achievement tracking
+  try {
+    const deaths = parseInt(localStorage.getItem('achDeaths') || '0', 10) + 1;
+    localStorage.setItem('achDeaths', String(deaths));
+    const totalCoinsEver = parseInt(localStorage.getItem('achTotalCoins') || '0', 10) + Math.max(0, distCoins);
+    localStorage.setItem('achTotalCoins', String(totalCoinsEver));
+    const totalDist = parseInt(localStorage.getItem('achTotalDistance') || '0', 10) + Math.floor(state.distance);
+    localStorage.setItem('achTotalDistance', String(totalDist));
+    const bestStreak = parseInt(localStorage.getItem('bestStreak') || '0', 10);
+    if (state.streak > bestStreak) localStorage.setItem('bestStreak', String(state.streak));
+    const runs = parseInt(localStorage.getItem('neonRunCount') || '0', 10) + 1;
+    localStorage.setItem('neonRunCount', String(runs));
+  } catch {}
   passedObstacleIds.clear();
   playDeath(); stopMusic();
 }
