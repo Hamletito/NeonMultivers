@@ -500,6 +500,7 @@ function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: num
   state.screenShake = 1.2;
   // Stay in 'playing' for 1.5s of death animation; gameover triggered by dyingTimer reaching 0
   state.dyingTimer = 1500;
+  const finalStreak = state.streak;
   state.streak = 0; state.streakMultiplier = 1;
   const distCoins = Math.floor(state.distance / 10 * 0.4); // 60% reduction
   state.coins += distCoins; state.totalCoins += distCoins;
@@ -509,6 +510,19 @@ function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: num
     saveBestGhost(state.ghostFrames);
   }
   localStorage.setItem('coins', String(state.totalCoins));
+  // Achievement tracking
+  try {
+    const deaths = parseInt(localStorage.getItem('achDeaths') || '0', 10) + 1;
+    localStorage.setItem('achDeaths', String(deaths));
+    const totalCoinsEver = parseInt(localStorage.getItem('achTotalCoins') || '0', 10) + Math.max(0, distCoins);
+    localStorage.setItem('achTotalCoins', String(totalCoinsEver));
+    const totalDist = parseInt(localStorage.getItem('achTotalDistance') || '0', 10) + Math.floor(state.distance);
+    localStorage.setItem('achTotalDistance', String(totalDist));
+    const bestStreak = parseInt(localStorage.getItem('bestStreak') || '0', 10);
+    if (finalStreak > bestStreak) localStorage.setItem('bestStreak', String(finalStreak));
+    const runs = parseInt(localStorage.getItem('neonRunCount') || '0', 10) + 1;
+    localStorage.setItem('neonRunCount', String(runs));
+  } catch {}
   passedObstacleIds.clear();
   playDeath(); stopMusic();
 }
@@ -747,6 +761,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     if (state.multiverseTimer <= 0) {
       state.multiverseActive = false;
       state.multiverseMergeTimer = 500;
+      try { const ms = parseInt(localStorage.getItem('achMultiverseSurvived') || '0', 10) + 1; localStorage.setItem('achMultiverseSurvived', String(ms)); } catch {}
       const nextDist = state.chaosMode ? (state.distance + 200 + Math.random() * 200) : (state.distance + 300 + Math.random() * 300);
       state.nextMultiverseAt = nextDist;
       state.multiverseObstacles = [[], [], []];
@@ -802,7 +817,18 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
   const ptWasJumping = pt.isJumping;
   if (pt.isJumping) { pt.vy += GRAVITY; pt.y += pt.vy; if (pt.y >= lineY - PLAYER_SIZE / 2) { pt.y = lineY - PLAYER_SIZE / 2; pt.vy = 0; pt.isJumping = false; } }
   else pt.y = lineY - PLAYER_SIZE / 2;
-  if (ptWasJumping && !pt.isJumping) { pt.landTimer = 100; pt.rotation = 0; addLandingParticles(state.particles, pt, lineY, skinColor); playLand(); }
+  if (ptWasJumping && !pt.isJumping) {
+    const slamForce = Math.abs(pt.vy);
+    const isSlam = slamForce >= 10;
+    pt.landTimer = isSlam ? 180 : 100; pt.rotation = 0;
+    addLandingParticles(state.particles, pt, lineY, skinColor);
+    if (isSlam) {
+      addLandingParticles(state.particles, pt, lineY, skinColor);
+      addLandingParticles(state.particles, pt, lineY, skinColor);
+      if (state.settings.screenShakeEnabled) state.screenShake = Math.max(state.screenShake, 0.4);
+    }
+    playLand();
+  }
   if (!ptWasJumping && pt.isJumping && state.equippedJump && state.settings.particlesEnabled) addJumpEffect(state.particles, pt, state.equippedJump);
   updatePlayerAnim(pt, dt);
   if (frameCount % 3 === 0 && state.settings.particlesEnabled) addTrailParticle(state.particles, pt, skinColor, state.equippedTrail);
@@ -896,11 +922,25 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
     return { ...c, x: nx, y: ny };
   }).filter(c => c.x > -50 && !c.collected);
 
-  // Streak tracking + adrenaline fill
+  // Streak tracking + adrenaline fill + near-miss
   for (const obs of state.obstacles) {
     const oid = (obs as any)._id as number;
     if (oid !== undefined && obs.x + obs.size / 2 < pt.x && !passedObstacleIds.has(oid)) {
       passedObstacleIds.add(oid); state.streak++;
+      // Near-miss detection: obstacle within 1.2x player size at pass moment
+      const dy = Math.abs(pt.y - obs.y);
+      if (dy < PLAYER_SIZE * 1.2 && obs.type !== 'fake' && obs.type !== 'speed_pad') {
+        // Spark burst
+        if (state.settings.particlesEnabled) {
+          for (let s = 0; s < 8; s++) {
+            state.particles.push({ x: pt.x, y: pt.y, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, life: 0.4, maxLife: 0.4, color: '#ffd700', size: 1.5 + Math.random() * 1.5 });
+          }
+        }
+        state.cinematicSlowMo = Math.max(state.cinematicSlowMo, 150);
+        if (!state.adrenalineActive) state.adrenaline = Math.min(100, state.adrenaline + 10);
+        // Achievement counter
+        try { const cur = parseInt(localStorage.getItem('achNearMisses') || '0', 10); localStorage.setItem('achNearMisses', String(cur + 1)); } catch {}
+      }
       state.lastDodgeTime = Date.now();
       if (!state.adrenalineActive) state.adrenaline = Math.min(100, state.adrenaline + 15);
       if (state.streak >= 30) state.streakMultiplier = 4;
