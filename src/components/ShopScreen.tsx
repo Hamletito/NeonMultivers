@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { SHOP_ITEMS } from '../game/constants';
 import { ShopItem } from '../game/types';
 import { ArrowLeft } from 'lucide-react';
+import { showRewarded, getFreeCoinsRemaining, consumeFreeCoinSlot, FREE_COINS_PER_AD, FREE_COINS_MAX_PER_DAY } from '../lib/unityAds';
+import RewardCountdown from './RewardCountdown';
 
 interface Props {
   coins: number;
@@ -16,6 +18,7 @@ interface Props {
   onEquip: (item: ShopItem) => void;
   onRemoveAds: () => void;
   onBack: () => void;
+  onFreeCoins: (amount: number) => void;
 }
 
 type Tab = 'skins' | 'trails' | 'death' | 'jump' | 'backgrounds' | 'floor' | 'powerups';
