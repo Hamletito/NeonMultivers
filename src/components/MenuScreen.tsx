@@ -37,7 +37,7 @@ export default function MenuScreen({ state, onPlay, onShop, onGhostMode, onChaos
       </button>
 
       <h1 className="text-5xl font-bold tracking-wider text-primary drop-shadow-[0_0_30px_rgba(0,255,204,0.5)] font-mono animate-pulse">
-        NEON RUN
+        NeonMultiverse
       </h1>
       <p className="text-muted-foreground text-sm font-mono">
         Best: <span className="text-primary">{state.bestScore}</span>

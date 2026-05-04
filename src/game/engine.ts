@@ -304,6 +304,7 @@ export function createInitialState(): GameState {
     chaosSpeedSpikeTimer: 0, chaosInvisibleFloorTimer: 0,
     nextChaosEventAt: 300, chaosFlickerTimer: 0,
     dyingTimer: 0, invincibleTimer: 0,
+    coinsEarnedThisRun: 0, doubledCoinsUsed: false, powerUpAdsUsedThisRun: 0,
   };
 }
 
@@ -336,6 +337,7 @@ export function resetForNewGame(state: GameState): GameState {
     chaosSpeedSpikeTimer: 0, chaosInvisibleFloorTimer: 0,
     nextChaosEventAt: 300, chaosFlickerTimer: 0,
     dyingTimer: 0, invincibleTimer: 0,
+    coinsEarnedThisRun: 0, doubledCoinsUsed: false, powerUpAdsUsedThisRun: 0,
   };
 }
 
@@ -503,7 +505,7 @@ function handleDeath(state: GameState, p: Player, skinColor: string, _lineY: num
   const finalStreak = state.streak;
   state.streak = 0; state.streakMultiplier = 1;
   const distCoins = Math.floor(state.distance / 10 * 0.4); // 60% reduction
-  state.coins += distCoins; state.totalCoins += distCoins;
+  state.coins += distCoins; state.totalCoins += distCoins; state.coinsEarnedThisRun += distCoins;
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
     localStorage.setItem('bestScore', String(state.bestScore));
@@ -960,7 +962,7 @@ export function update(state: GameState, canvasW: number, canvasH: number, dt: n
       if (Math.sqrt(dx * dx + dy * dy) < p.size / 2 + coin.radius) {
         coin.collected = true;
         const gain = state.streakMultiplier * mvMult;
-        state.coins += gain; state.totalCoins += gain;
+        state.coins += gain; state.totalCoins += gain; state.coinsEarnedThisRun += gain;
         state.coinFlash = 1; addParticles(state.particles, coin.x, coin.y, '#facc15', 16);
         playCoin();
       }

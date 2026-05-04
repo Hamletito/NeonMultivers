@@ -13,6 +13,8 @@ import AchievementsScreen from '../components/AchievementsScreen';
 import { GameState, ShopItem, GameSettings, PlayerProfile } from '../game/types';
 import { createInitialState, resetForNewGame, activateAdrenaline } from '../game/engine';
 import { toggleMute, isMuted, startMusic, stopMusic, setMasterVolume, setSfxEnabled, setMusicEnabled } from '../game/audio';
+import { showInterstitial, shouldShowGameOverInterstitial } from '../lib/unityAds';
+import BannerAd from '../components/BannerAd';
 
 function loadProfile(): PlayerProfile | null {
   try {
@@ -32,6 +34,13 @@ const Index = () => {
 
   const needsProfile = !profile?.created;
   const needsTutorial = profile?.created && localStorage.getItem('tutorialDone') !== 'true';
+
+  // Show interstitial every 2nd game over (fire-and-forget; never blocks game over screen).
+  useEffect(() => {
+    if (state.screen !== 'gameover') return;
+    if (!shouldShowGameOverInterstitial()) return;
+    showInterstitial(3000).catch(() => {});
+  }, [state.screen]);
 
   const handlePlay = useCallback(() => {
     if (needsTutorial) {
@@ -150,7 +159,7 @@ const Index = () => {
         <div className="rotate-prompt">
           <div className="icon">📱</div>
           <p className="font-mono text-lg text-primary">Rotate your device</p>
-          <p className="font-mono text-xs text-muted-foreground">Neon Run is best played in landscape</p>
+          <p className="font-mono text-xs text-muted-foreground">NeonMultiverse is best played in landscape</p>
         </div>
         <div className="w-full h-screen overflow-hidden bg-background rotate-app-content">
           <ProfileScreen onComplete={handleProfileComplete} />
@@ -164,7 +173,7 @@ const Index = () => {
       <div className="rotate-prompt">
         <div className="icon">📱</div>
         <p className="font-mono text-lg text-primary">Rotate your device</p>
-        <p className="font-mono text-xs text-muted-foreground">Neon Run is best played in landscape</p>
+        <p className="font-mono text-xs text-muted-foreground">NeonMultiverse is best played in landscape</p>
       </div>
       <div className="w-full h-screen overflow-hidden bg-background rotate-app-content">
         <GameCanvas state={state} onStateChange={setState} />
@@ -174,18 +183,46 @@ const Index = () => {
           <AchievementsScreen onBack={() => setShowAchievements(false)} onCoinsUpdate={(c) => setState(s => ({ ...s, coins: c, totalCoins: c }))} />
         )}
         <HUD state={state} onPause={handlePause} onActivatePower={handleActivatePower} onAdrenaline={handleAdrenaline} onSettings={handleSettings} />
-        <GameOverScreen state={state} onRevive={handleRevive} onMenu={handleMenu} />
+        <GameOverScreen
+          state={state}
+          onRevive={handleRevive}
+          onMenu={handleMenu}
+          onDoubleCoins={(extra) => setState(s => {
+            if (s.doubledCoinsUsed) return s;
+            const newTotal = s.totalCoins + extra;
+            localStorage.setItem('coins', String(newTotal));
+            return { ...s, coins: newTotal, totalCoins: newTotal, doubledCoinsUsed: true };
+          })}
+        />
         <PauseOverlay visible={state.screen === 'paused' && !showInGameSettings} onResume={handleResume} onMenu={handleMenu} />
         {showInGameSettings && (
           <InGameSettings settings={state.settings} onUpdate={handleUpdateSettings} onClose={handleCloseInGameSettings} />
         )}
         {state.screen === 'shop' && (
-          <ShopScreen coins={state.totalCoins} removeAds={state.removeAds} equippedSkin={state.equippedSkin} equippedTrail={state.equippedTrail} equippedDeath={state.equippedDeath} equippedJump={state.equippedJump} equippedBackground={state.equippedBackground} equippedFloor={state.equippedFloor} onBuy={handleBuy} onEquip={handleEquip} onRemoveAds={handleRemoveAds} onBack={handleMenu} />
+          <ShopScreen
+            coins={state.totalCoins}
+            removeAds={state.removeAds}
+            equippedSkin={state.equippedSkin}
+            equippedTrail={state.equippedTrail}
+            equippedDeath={state.equippedDeath}
+            equippedJump={state.equippedJump}
+            equippedBackground={state.equippedBackground}
+            equippedFloor={state.equippedFloor}
+            onBuy={handleBuy}
+            onEquip={handleEquip}
+            onRemoveAds={handleRemoveAds}
+            onBack={handleMenu}
+            onFreeCoins={(amount) => setState(s => {
+              const t = s.totalCoins + amount;
+              localStorage.setItem('coins', String(t));
+              return { ...s, coins: t, totalCoins: t };
+            })}
+          />
         )}
         {state.screen === 'settings' && (
           <SettingsScreen settings={state.settings} onUpdate={handleUpdateSettings} onBack={handleMenu} />
         )}
-        <div id="banner-ad" className="fixed bottom-0 left-0 right-0 h-[60px] z-10" />
+        <BannerAd />
       </div>
     </>
   );

@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { SHOP_ITEMS } from '../game/constants';
 import { ShopItem } from '../game/types';
 import { ArrowLeft } from 'lucide-react';
+import { showRewarded, getFreeCoinsRemaining, consumeFreeCoinSlot, FREE_COINS_PER_AD, FREE_COINS_MAX_PER_DAY } from '../lib/unityAds';
+import RewardCountdown from './RewardCountdown';
 
 interface Props {
   coins: number;
@@ -16,6 +18,7 @@ interface Props {
   onEquip: (item: ShopItem) => void;
   onRemoveAds: () => void;
   onBack: () => void;
+  onFreeCoins: (amount: number) => void;
 }
 
 type Tab = 'skins' | 'trails' | 'death' | 'jump' | 'backgrounds' | 'floor' | 'powerups';
@@ -456,8 +459,8 @@ function drawStarShape(ctx: CanvasRenderingContext2D, cx: number, cy: number, sp
   ctx.closePath(); ctx.fill();
 }
 
-export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack, ...props }: Props) {
-  const allProps = { coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack };
+export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack, onFreeCoins }: Props) {
+  const allProps = { coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack, onFreeCoins };
   const [tab, setTab] = useState<Tab>('skins');
   const [ownedIds, setOwnedIds] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('ownedItems');
@@ -501,6 +504,7 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-20">
+        <FreeCoinsSection onFreeCoins={onFreeCoins} />
         <div className="grid grid-cols-2 gap-3">
           {items.map(item => {
             const owned = ownedIds.has(item.id);
@@ -563,3 +567,60 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
     </div>
   );
 }
+
+function FreeCoinsSection({ onFreeCoins }: { onFreeCoins: (n: number) => void }) {
+  const [remaining, setRemaining] = useState<number>(getFreeCoinsRemaining());
+  const [mode, setMode] = useState<'idle' | 'loading' | 'fallback'>('idle');
+
+  const grant = () => {
+    const reward = consumeFreeCoinSlot();
+    onFreeCoins(reward);
+    setRemaining(getFreeCoinsRemaining());
+    setMode('idle');
+  };
+
+  const handleClick = async () => {
+    if (remaining <= 0) return;
+    setMode('loading');
+    try {
+      const ok = await showRewarded(3000);
+      if (ok) grant();
+      else setMode('fallback');
+    } catch {
+      setMode('fallback');
+    }
+  };
+
+  return (
+    <div className="mb-4 p-3 rounded-xl border border-yellow-500/40 bg-yellow-500/5">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="font-mono text-xs text-yellow-400">🎁 FREE COINS</span>
+        <span className="font-mono text-[10px] text-muted-foreground">{remaining}/{FREE_COINS_MAX_PER_DAY} remaining today</span>
+      </div>
+      {mode === 'idle' && (
+        <button
+          onClick={handleClick}
+          disabled={remaining <= 0}
+          className={`w-full px-3 py-2 font-mono text-xs rounded-lg border transition-all ${
+            remaining > 0
+              ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400 hover:bg-yellow-500/30'
+              : 'bg-muted/10 border-muted/30 text-muted-foreground cursor-not-allowed'
+          }`}
+        >
+          🎬 {remaining > 0 ? `Watch ad for ${FREE_COINS_PER_AD} coins` : 'Vuelve mañana'}
+        </button>
+      )}
+      {mode === 'loading' && (
+        <div className="flex justify-center py-2">
+          <div className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+      {mode === 'fallback' && (
+        <div className="flex justify-center py-1">
+          <RewardCountdown seconds={5} onComplete={grant} label={`+${FREE_COINS_PER_AD} coins...`} />
+        </div>
+      )}
+    </div>
+  );
+}
+
