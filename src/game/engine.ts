@@ -304,6 +304,7 @@ export function createInitialState(): GameState {
     chaosSpeedSpikeTimer: 0, chaosInvisibleFloorTimer: 0,
     nextChaosEventAt: 300, chaosFlickerTimer: 0,
     dyingTimer: 0, invincibleTimer: 0,
+    coinsEarnedThisRun: 0, doubledCoinsUsed: false, powerUpAdsUsedThisRun: 0,
   };
 }
 
@@ -336,6 +337,7 @@ export function resetForNewGame(state: GameState): GameState {
     chaosSpeedSpikeTimer: 0, chaosInvisibleFloorTimer: 0,
     nextChaosEventAt: 300, chaosFlickerTimer: 0,
     dyingTimer: 0, invincibleTimer: 0,
+    coinsEarnedThisRun: 0, doubledCoinsUsed: false, powerUpAdsUsedThisRun: 0,
   };
 }
 

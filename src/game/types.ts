@@ -231,4 +231,8 @@ export interface GameState {
   // Death animation gating + post-revive invincibility
   dyingTimer: number; // ms remaining before transitioning to gameover
   invincibleTimer: number; // ms remaining of post-revive invincibility
+  // Ads / economy
+  coinsEarnedThisRun: number;
+  doubledCoinsUsed: boolean;
+  powerUpAdsUsedThisRun: number;
 }
