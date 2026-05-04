@@ -35,6 +35,13 @@ const Index = () => {
   const needsProfile = !profile?.created;
   const needsTutorial = profile?.created && localStorage.getItem('tutorialDone') !== 'true';
 
+  // Show interstitial every 2nd game over (fire-and-forget; never blocks game over screen).
+  useEffect(() => {
+    if (state.screen !== 'gameover') return;
+    if (!shouldShowGameOverInterstitial()) return;
+    showInterstitial(3000).catch(() => {});
+  }, [state.screen]);
+
   const handlePlay = useCallback(() => {
     if (needsTutorial) {
       setShowTutorial(true);
