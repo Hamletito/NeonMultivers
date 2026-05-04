@@ -459,8 +459,8 @@ function drawStarShape(ctx: CanvasRenderingContext2D, cx: number, cy: number, sp
   ctx.closePath(); ctx.fill();
 }
 
-export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack, ...props }: Props) {
-  const allProps = { coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack };
+export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack, onFreeCoins }: Props) {
+  const allProps = { coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack, onFreeCoins };
   const [tab, setTab] = useState<Tab>('skins');
   const [ownedIds, setOwnedIds] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('ownedItems');
