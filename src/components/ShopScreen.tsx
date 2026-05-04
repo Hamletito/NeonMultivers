@@ -504,6 +504,7 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-20">
+        <FreeCoinsSection onFreeCoins={onFreeCoins} />
         <div className="grid grid-cols-2 gap-3">
           {items.map(item => {
             const owned = ownedIds.has(item.id);
