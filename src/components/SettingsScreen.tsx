@@ -220,16 +220,29 @@ export default function SettingsScreen({ settings, onUpdate, onBack }: Props) {
         )}
 
         {tab === 'about' && (
-          <div className="space-y-4 text-center">
-            <p className="text-foreground font-mono text-lg">NEON RUN</p>
+          <div className="space-y-3 text-center">
+            <p className="text-foreground font-mono text-lg">NeonMultiverse</p>
             <p className="text-muted-foreground font-mono text-xs">v1.0.0</p>
-            <p className="text-muted-foreground font-mono text-xs">Hecho con ❤️</p>
-            <a
-              href="mailto:bugs@neonrun.game?subject=Bug Report"
-              className="inline-block px-4 py-2 bg-primary/20 border border-primary text-primary font-mono text-xs rounded-lg hover:bg-primary/30 transition-all"
-            >
-              🐛 Reportar un error
-            </a>
+            <div className="text-muted-foreground font-mono text-[11px] space-y-1 pt-2">
+              <p>Desarrollado por <span className="text-foreground">Jonathan Daniel Castor Merchán</span></p>
+              <p>Estudio: <span className="text-foreground">Project Dark</span></p>
+              <p>Contacto: <span className="text-foreground">joncastrome20@gmail.com</span></p>
+            </div>
+            <p className="text-muted-foreground font-mono text-xs pt-2">Hecho con ❤️</p>
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <a
+                href="mailto:joncastrome20@gmail.com?subject=NeonMultiverse Bug Report"
+                className="inline-block px-4 py-2 bg-primary/20 border border-primary text-primary font-mono text-xs rounded-lg hover:bg-primary/30 transition-all"
+              >
+                🐛 Reportar un error
+              </a>
+              <button
+                onClick={() => window.open('https://hamletito.github.io/NeonMultivers/privacy-policy.html', '_blank')}
+                className="inline-block px-4 py-2 bg-card border border-border text-foreground/80 font-mono text-xs rounded-lg hover:bg-card/70 transition-all"
+              >
+                📄 Privacy Policy
+              </button>
+            </div>
           </div>
         )}
       </div>
