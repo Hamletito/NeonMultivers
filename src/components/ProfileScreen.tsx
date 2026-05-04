@@ -122,6 +122,13 @@ export default function ProfileScreen({ onComplete }: Props) {
       >
         {step === 3 ? 'START' : 'SIGUIENTE →'}
       </button>
+
+      <button
+        onClick={() => window.open('https://hamletito.github.io/NeonMultivers/privacy-policy.html', '_blank')}
+        className="absolute bottom-4 text-[11px] font-mono text-muted-foreground hover:text-primary underline-offset-2 hover:underline transition-colors"
+      >
+        Privacy Policy
+      </button>
     </div>
   );
 }
