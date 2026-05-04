@@ -111,7 +111,7 @@ export default function GameOverScreen({ state, onRevive, onMenu }: Props) {
         <button
           onClick={() => {
             if (navigator.share) {
-              navigator.share({ title: 'Neon Run', text: `I scored ${state.score} in Neon Run!` });
+              navigator.share({ title: 'NeonMultiverse', text: `I scored ${state.score} in NeonMultiverse!` });
             }
           }}
           className="px-6 py-2 bg-accent/20 border border-accent text-accent font-mono rounded-lg text-sm hover:bg-accent/30 transition-all"

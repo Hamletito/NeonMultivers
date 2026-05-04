@@ -150,7 +150,7 @@ const Index = () => {
         <div className="rotate-prompt">
           <div className="icon">📱</div>
           <p className="font-mono text-lg text-primary">Rotate your device</p>
-          <p className="font-mono text-xs text-muted-foreground">Neon Run is best played in landscape</p>
+          <p className="font-mono text-xs text-muted-foreground">NeonMultiverse is best played in landscape</p>
         </div>
         <div className="w-full h-screen overflow-hidden bg-background rotate-app-content">
           <ProfileScreen onComplete={handleProfileComplete} />
@@ -164,7 +164,7 @@ const Index = () => {
       <div className="rotate-prompt">
         <div className="icon">📱</div>
         <p className="font-mono text-lg text-primary">Rotate your device</p>
-        <p className="font-mono text-xs text-muted-foreground">Neon Run is best played in landscape</p>
+        <p className="font-mono text-xs text-muted-foreground">NeonMultiverse is best played in landscape</p>
       </div>
       <div className="w-full h-screen overflow-hidden bg-background rotate-app-content">
         <GameCanvas state={state} onStateChange={setState} />

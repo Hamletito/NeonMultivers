@@ -1,4 +1,4 @@
-// Procedural Web Audio API sound system for Neon Run
+// Procedural Web Audio API sound system for NeonMultiverse
 
 let ctx: AudioContext | null = null;
 let muted = false;
