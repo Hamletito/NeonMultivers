@@ -1,54 +1,59 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GameState } from '../game/types';
+import { showRewarded } from '../lib/unityAds';
+import RewardCountdown from './RewardCountdown';
 
 interface Props {
   state: GameState;
   onRevive: () => void;
   onMenu: () => void;
+  onDoubleCoins: (extra: number) => void;
 }
 
-export default function GameOverScreen({ state, onRevive, onMenu }: Props) {
-  const [showRevive, setShowRevive] = useState(true);
-  const [countdown, setCountdown] = useState(5);
-  const [adLoading, setAdLoading] = useState(false);
-  const [adFailed, setAdFailed] = useState(false);
+type Mode = 'idle' | 'revive-loading' | 'revive-fallback' | 'double-loading' | 'double-fallback';
+
+export default function GameOverScreen({ state, onRevive, onMenu, onDoubleCoins }: Props) {
+  const [mode, setMode] = useState<Mode>('idle');
+  const [doubled, setDoubled] = useState(false);
 
   const canFreeRevive = !state.freeReviveUsed;
+  const earned = state.coinsEarnedThisRun || 0;
 
   useEffect(() => {
     if (state.screen !== 'gameover') {
-      setShowRevive(true);
-      setCountdown(5);
-      setAdLoading(false);
-      setAdFailed(false);
+      setMode('idle');
+      setDoubled(false);
     }
   }, [state.screen]);
 
-  const handleRevive = useCallback(() => {
-    if (canFreeRevive) {
-      onRevive();
-      return;
+  const tryRevive = useCallback(async () => {
+    if (canFreeRevive) { onRevive(); return; }
+    setMode('revive-loading');
+    try {
+      const ok = await showRewarded(3000);
+      if (ok) onRevive();
+      else setMode('revive-fallback');
+    } catch {
+      setMode('revive-fallback');
     }
-    // Simulate ad load attempt (3s timeout)
-    setAdLoading(true);
-    const timer = setTimeout(() => {
-      // Ad failed to load — show countdown
-      setAdLoading(false);
-      setAdFailed(true);
-    }, 3000);
-    return () => clearTimeout(timer);
   }, [canFreeRevive, onRevive]);
 
-  // Countdown when ad fails
-  useEffect(() => {
-    if (!adFailed) return;
-    if (countdown <= 0) {
-      onRevive();
-      return;
+  const tryDouble = useCallback(async () => {
+    if (doubled || state.doubledCoinsUsed) return;
+    setMode('double-loading');
+    try {
+      const ok = await showRewarded(3000);
+      if (ok) {
+        setDoubled(true);
+        onDoubleCoins(earned);
+        setMode('idle');
+      } else {
+        setMode('double-fallback');
+      }
+    } catch {
+      setMode('double-fallback');
     }
-    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [adFailed, countdown, onRevive]);
+  }, [doubled, state.doubledCoinsUsed, earned, onDoubleCoins]);
 
   if (state.screen !== 'gameover') return null;
 
@@ -56,75 +61,76 @@ export default function GameOverScreen({ state, onRevive, onMenu }: Props) {
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-background/80 backdrop-blur-sm pointer-events-auto">
-      <div className="flex flex-col items-center gap-4 p-8 bg-card/90 border border-border rounded-2xl max-w-xs w-full">
-        <h2 className="text-3xl font-bold text-destructive font-mono">GAME OVER</h2>
+      <div className="flex flex-col items-center gap-3 p-6 bg-card/90 border border-border rounded-2xl max-w-xs w-full">
+        <h2 className="text-2xl font-bold text-destructive font-mono">GAME OVER</h2>
 
         <div className="text-center space-y-1">
           <p className="text-foreground font-mono text-xl">{state.score}</p>
-          {isNewBest && (
-            <p className="text-primary text-xs font-mono animate-pulse">NEW BEST!</p>
-          )}
-          <p className="text-muted-foreground text-xs font-mono">
-            Best: {state.bestScore}
-          </p>
+          {isNewBest && <p className="text-primary text-xs font-mono animate-pulse">NEW BEST!</p>}
+          <p className="text-muted-foreground text-xs font-mono">Best: {state.bestScore}</p>
+          <p className="text-yellow-400 text-xs font-mono">+{earned} 🪙 this run{doubled ? ' (x2!)' : ''}</p>
         </div>
 
-        {showRevive && (
-          <>
-            {adLoading ? (
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-muted-foreground text-xs font-mono">Loading ad...</p>
-              </div>
-            ) : adFailed ? (
-              <div className="flex flex-col items-center gap-2">
-                <div className="relative w-16 h-16">
-                  <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
-                    <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--muted))" strokeWidth="4" />
-                    <circle
-                      cx="32" cy="32" r="28"
-                      fill="none"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth="4"
-                      strokeDasharray={175.93}
-                      strokeDashoffset={175.93 * (countdown / 5)}
-                      className="transition-all duration-1000"
-                    />
-                  </svg>
-                  <span className="absolute inset-0 flex items-center justify-center text-primary font-mono text-lg font-bold">
-                    {countdown}
-                  </span>
-                </div>
-                <p className="text-muted-foreground text-xs font-mono">Reviving...</p>
-              </div>
-            ) : (
-              <button
-                onClick={handleRevive}
-                className="px-6 py-2 bg-primary/20 border border-primary text-primary font-mono rounded-lg hover:bg-primary/30 transition-all text-sm"
-              >
-                {canFreeRevive ? '🔄 FREE REVIVE' : '📺 REVIVE (Watch Ad)'}
-              </button>
-            )}
-          </>
+        {mode === 'revive-loading' && (
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-muted-foreground text-xs font-mono">Loading ad...</p>
+          </div>
+        )}
+        {mode === 'revive-fallback' && (
+          <RewardCountdown seconds={5} onComplete={onRevive} label="Reviving..." />
+        )}
+        {mode === 'double-loading' && (
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-10 h-10 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+            <p className="text-muted-foreground text-xs font-mono">Loading ad...</p>
+          </div>
+        )}
+        {mode === 'double-fallback' && (
+          <RewardCountdown
+            seconds={5}
+            onComplete={() => { setDoubled(true); onDoubleCoins(earned); setMode('idle'); }}
+            label="Doubling coins..."
+          />
         )}
 
-        <button
-          onClick={() => {
-            if (navigator.share) {
-              navigator.share({ title: 'NeonMultiverse', text: `I scored ${state.score} in NeonMultiverse!` });
-            }
-          }}
-          className="px-6 py-2 bg-accent/20 border border-accent text-accent font-mono rounded-lg text-sm hover:bg-accent/30 transition-all"
-        >
-          SHARE
-        </button>
+        {mode === 'idle' && (
+          <div className="flex flex-col gap-2 w-full">
+            <button
+              onClick={tryRevive}
+              className="px-4 py-2 bg-green-500/20 border border-green-500 text-green-400 font-mono rounded-lg hover:bg-green-500/30 transition-all text-sm"
+            >
+              {canFreeRevive ? '💚 FREE REVIVE' : '💚 REVIVE (Watch Ad)'}
+            </button>
 
-        <button
-          onClick={onMenu}
-          className="text-muted-foreground text-xs font-mono hover:text-foreground transition-colors"
-        >
-          BACK TO MENU
-        </button>
+            {!doubled && !state.doubledCoinsUsed && earned > 0 && (
+              <button
+                onClick={tryDouble}
+                className="px-4 py-2 bg-yellow-500/20 border border-yellow-500 text-yellow-400 font-mono rounded-lg hover:bg-yellow-500/30 transition-all text-xs"
+              >
+                💰 2X COINS — Watch ad to double your {earned} coins!
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({ title: 'NeonMultiverse', text: `I scored ${state.score} in NeonMultiverse!` });
+                }
+              }}
+              className="px-4 py-2 bg-accent/20 border border-accent text-accent font-mono rounded-lg text-xs hover:bg-accent/30 transition-all"
+            >
+              SHARE
+            </button>
+
+            <button
+              onClick={onMenu}
+              className="text-muted-foreground text-xs font-mono hover:text-foreground transition-colors mt-1"
+            >
+              BACK TO MENU
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
