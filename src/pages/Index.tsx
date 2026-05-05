@@ -10,10 +10,12 @@ import ProfileScreen from '../components/ProfileScreen';
 import TutorialOverlay from '../components/TutorialOverlay';
 import InGameSettings from '../components/InGameSettings';
 import AchievementsScreen from '../components/AchievementsScreen';
+import LanguageSelectScreen from '../components/LanguageSelectScreen';
 import { GameState, ShopItem, GameSettings, PlayerProfile } from '../game/types';
 import { createInitialState, resetForNewGame, activateAdrenaline } from '../game/engine';
 import { toggleMute, isMuted, startMusic, stopMusic, setMasterVolume, setSfxEnabled, setMusicEnabled } from '../game/audio';
 import { showInterstitial, shouldShowGameOverInterstitial } from '../lib/unityAds';
+import { isLangChosen, useT } from '../lib/i18n';
 import BannerAd from '../components/BannerAd';
 
 function loadProfile(): PlayerProfile | null {
@@ -25,13 +27,16 @@ function loadProfile(): PlayerProfile | null {
 }
 
 const Index = () => {
+  useT(); // re-render when language changes
   const [state, setState] = useState<GameState>(createInitialState);
   const [muted, setMuted] = useState(isMuted());
   const [profile, setProfile] = useState<PlayerProfile | null>(loadProfile);
+  const [langChosen, setLangChosen] = useState<boolean>(isLangChosen());
   const [showTutorial, setShowTutorial] = useState(false);
   const [showInGameSettings, setShowInGameSettings] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
 
+  const needsLang = !langChosen;
   const needsProfile = !profile?.created;
   const needsTutorial = profile?.created && localStorage.getItem('tutorialDone') !== 'true';
 
