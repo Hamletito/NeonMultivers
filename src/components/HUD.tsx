@@ -41,7 +41,7 @@ export default function HUD({ state, onPause, onActivatePower, onAdrenaline, onS
           )}
           {state.settings.showAdrenaline && (
             <div className="mt-1 flex items-center gap-1.5">
-              <span className="text-[9px] font-mono text-yellow-400/70">ADRENALINE</span>
+              <span className="text-[9px] font-mono text-yellow-400/70">{t('hud.adrenaline')}</span>
               <div className="relative w-20 h-2 bg-white/10 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full transition-all duration-200 ${adrenalineFull ? 'bg-yellow-400 animate-pulse' : 'bg-yellow-500/70'}`} style={{ width: `${state.adrenaline}%` }} />
               </div>
@@ -58,18 +58,18 @@ export default function HUD({ state, onPause, onActivatePower, onAdrenaline, onS
       </div>
       <div className="flex justify-center gap-2 px-4">
         {!state.hasShield && !hasActive('shield') && (
-          <button onClick={() => onActivatePower('shield')} className="px-3 py-1 bg-primary/10 border border-primary/40 text-primary font-mono text-xs rounded-lg hover:bg-primary/20 transition-all">🛡️ Shield</button>
+          <button onClick={() => onActivatePower('shield')} className="px-3 py-1 bg-primary/10 border border-primary/40 text-primary font-mono text-xs rounded-lg hover:bg-primary/20 transition-all">{t('hud.shield')}</button>
         )}
         {!hasActive('slowmo') && (
-          <button onClick={() => onActivatePower('slowmo')} className="px-3 py-1 bg-primary/10 border border-primary/40 text-primary font-mono text-xs rounded-lg hover:bg-primary/20 transition-all">🐌 Slow-Mo</button>
+          <button onClick={() => onActivatePower('slowmo')} className="px-3 py-1 bg-primary/10 border border-primary/40 text-primary font-mono text-xs rounded-lg hover:bg-primary/20 transition-all">{t('hud.slowmo')}</button>
         )}
         {!hasActive('magnet') && (
-          <button onClick={() => onActivatePower('magnet')} className="px-3 py-1 bg-primary/10 border border-primary/40 text-primary font-mono text-xs rounded-lg hover:bg-primary/20 transition-all">🧲 Magnet</button>
+          <button onClick={() => onActivatePower('magnet')} className="px-3 py-1 bg-primary/10 border border-primary/40 text-primary font-mono text-xs rounded-lg hover:bg-primary/20 transition-all">{t('hud.magnet')}</button>
         )}
       </div>
       {state.chaosMode && (
         <div className="text-center mt-1">
-          <span className="text-destructive font-mono text-[10px] animate-pulse">🔥 CHAOS MODE 🔥</span>
+          <span className="text-destructive font-mono text-[10px] animate-pulse">{t('hud.chaosLabel')}</span>
         </div>
       )}
     </div>
