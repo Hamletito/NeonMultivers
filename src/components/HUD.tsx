@@ -19,11 +19,15 @@ export default function HUD({ state, onPause, onActivatePower, onAdrenaline, onS
     <div className="fixed top-0 left-0 right-0 z-20 pointer-events-auto">
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-2">
-          <button onClick={onPause} className="text-foreground/60 hover:text-foreground transition-colors">
-            <Pause size={24} />
+          <button onClick={onPause} className="text-foreground/60 hover:text-foreground transition-colors active:scale-95">
+            <Pause size={22} />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onSettings(); }} className="text-foreground/60 hover:text-foreground transition-colors">
-            <Settings size={18} />
+          <button
+            onClick={(e) => { e.stopPropagation(); onSettings(); }}
+            aria-label="Settings"
+            className="w-7 h-7 rounded-full bg-foreground/5 border border-foreground/20 text-foreground/50 hover:text-foreground hover:border-primary/40 active:scale-95 transition-all flex items-center justify-center"
+          >
+            <Settings size={13} />
           </button>
         </div>
         <div className="text-center">
