@@ -221,10 +221,12 @@ function spawnSafeCoin(state: GameState, canvasW: number, lineY: number): Coin |
   if (windows.length === 0) return null;
   const [left, right] = randomFrom(windows);
   const x = (left + right) / 2;
-  const verticalOffset = PLAYER_SIZE + 34 + Math.random() * 10;
+  // Push orbs higher (was PLAYER_SIZE+34) so they float above the line, never on it.
+  const verticalOffset = PLAYER_SIZE + 60 + Math.random() * 10;
   const isTop = state.phase === 1 ? true : Math.random() > 0.5;
   const y = isTop ? lineY - verticalOffset : lineY + verticalOffset;
-  return { x, y, collected: false, radius: COIN_RADIUS };
+  // Smaller orbs (-40%): radius scaled from COIN_RADIUS*1.0 -> 0.6
+  return { x, y, collected: false, radius: Math.round(COIN_RADIUS * 0.6) };
 }
 
 function defaultExtraState() {

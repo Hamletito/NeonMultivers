@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { SHOP_ITEMS } from '../game/constants';
 import { ShopItem } from '../game/types';
 import { ArrowLeft } from 'lucide-react';
-import { showRewarded, getFreeCoinsRemaining, consumeFreeCoinSlot, FREE_COINS_PER_AD, FREE_COINS_MAX_PER_DAY } from '../lib/unityAds';
+import { showRewarded, consumeFreeCoinSlot, FREE_COINS_PER_AD } from '../lib/unityAds';
+import { useT } from '../lib/i18n';
 import RewardCountdown from './RewardCountdown';
 
 interface Props {
@@ -23,21 +24,21 @@ interface Props {
 
 type Tab = 'skins' | 'trails' | 'death' | 'jump' | 'backgrounds' | 'floor' | 'powerups';
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'skins', label: 'Skins' },
-  { key: 'trails', label: 'Trails' },
-  { key: 'death', label: 'Death' },
-  { key: 'jump', label: 'Jump' },
-  { key: 'backgrounds', label: 'BG' },
-  { key: 'floor', label: 'Floor' },
-  { key: 'powerups', label: 'Power' },
+const TABS: { key: Tab; tk: string }[] = [
+  { key: 'skins', tk: 'shop.tab.skins' },
+  { key: 'trails', tk: 'shop.tab.trails' },
+  { key: 'death', tk: 'shop.tab.death' },
+  { key: 'jump', tk: 'shop.tab.jump' },
+  { key: 'backgrounds', tk: 'shop.tab.backgrounds' },
+  { key: 'floor', tk: 'shop.tab.floor' },
+  { key: 'powerups', tk: 'shop.tab.powerups' },
 ];
 
-const RARITY_COLORS: Record<string, { bg: string; text: string; border: string; label: string }> = {
-  common: { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/40', label: 'Common' },
-  rare: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/40', label: 'Rare' },
-  epic: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/40', label: 'Epic' },
-  legendary: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/40', label: 'Legendary' },
+const RARITY_COLORS: Record<string, { bg: string; text: string; border: string; glow: string; label: string }> = {
+  common:    { bg: 'bg-gray-500/15',   text: 'text-gray-300',   border: 'border-gray-500/40',   glow: '',                                         label: 'Common' },
+  rare:      { bg: 'bg-blue-500/15',   text: 'text-blue-300',   border: 'border-blue-500/50',   glow: 'shadow-[0_0_12px_rgba(59,130,246,0.25)]',  label: 'Rare' },
+  epic:      { bg: 'bg-purple-500/15', text: 'text-purple-300', border: 'border-purple-500/50', glow: 'shadow-[0_0_14px_rgba(168,85,247,0.3)]',   label: 'Epic' },
+  legendary: { bg: 'bg-yellow-500/15', text: 'text-yellow-300', border: 'border-yellow-500/60', glow: 'shadow-[0_0_18px_rgba(250,204,21,0.4)]',   label: 'Legendary' },
 };
 
 const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary'];
@@ -460,12 +461,22 @@ function drawStarShape(ctx: CanvasRenderingContext2D, cx: number, cy: number, sp
 }
 
 export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack, onFreeCoins }: Props) {
+  const { t } = useT();
   const allProps = { coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack, onFreeCoins };
   const [tab, setTab] = useState<Tab>('skins');
   const [ownedIds, setOwnedIds] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('ownedItems');
     return saved ? new Set(JSON.parse(saved)) : new Set(SHOP_ITEMS.filter(i => i.owned).map(i => i.id));
   });
+  const [popId, setPopId] = useState<string | null>(null);
+  const [equippedToast, setEquippedToast] = useState<string | null>(null);
+
+  const RARITY_LABEL: Record<string, string> = {
+    common: t('shop.rarity.common'),
+    rare: t('shop.rarity.rare'),
+    epic: t('shop.rarity.epic'),
+    legendary: t('shop.rarity.legendary'),
+  };
 
   const items = SHOP_ITEMS
     .filter(i => {
@@ -480,62 +491,69 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
     })
     .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
 
-  const tabClass = (t: Tab) =>
-    `px-2.5 py-1.5 font-mono text-[10px] rounded-lg transition-all whitespace-nowrap ${tab === t
-      ? 'bg-primary/20 text-primary border border-primary'
-      : 'text-muted-foreground hover:text-foreground border border-transparent'}`;
+  const tabClass = (k: Tab) =>
+    `px-2.5 py-1 font-mono text-[10px] rounded-md transition-all whitespace-nowrap active:scale-95 ${tab === k
+      ? 'bg-primary/25 text-primary border border-primary shadow-[0_0_10px_rgba(0,255,204,0.3)]'
+      : 'text-muted-foreground hover:text-foreground border border-transparent bg-card/30'}`;
 
   return (
-    <div className="fixed inset-0 z-30 bg-background flex flex-col pointer-events-auto">
-      <div className="flex items-center justify-between p-4">
-        <button onClick={onBack} className="text-foreground/60 hover:text-foreground transition-colors">
-          <ArrowLeft size={24} />
+    <div className="fixed inset-0 z-30 bg-gradient-to-b from-background via-background to-[#0a0a18] flex flex-col pointer-events-auto">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-primary/20 bg-background/60 backdrop-blur-sm">
+        <button onClick={onBack} className="text-foreground/60 hover:text-foreground active:scale-95 transition-all">
+          <ArrowLeft size={20} />
         </button>
-        <h2 className="text-xl font-bold text-primary font-mono">SHOP</h2>
-        <div className="text-neon-yellow font-mono text-sm flex items-center gap-1">
-          <span>💰</span>{coins}
+        <h2 className="text-base font-bold text-primary font-mono tracking-wider drop-shadow-[0_0_10px_rgba(0,255,204,0.4)]">{t('shop.title')}</h2>
+        <div className="text-yellow-400 font-mono text-xs flex items-center gap-1 bg-yellow-400/10 border border-yellow-400/30 rounded-full px-2.5 py-1">
+          <span>💰</span><span className="font-bold">{coins}</span>
         </div>
       </div>
 
-      <div className="flex gap-1.5 px-3 mb-3 overflow-x-auto no-scrollbar">
-        {TABS.map(t => (
-          <button key={t.key} className={tabClass(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
+      <div className="flex gap-1 px-2 py-1.5 overflow-x-auto no-scrollbar border-b border-border/40">
+        {TABS.map(tt => (
+          <button key={tt.key} className={tabClass(tt.key)} onClick={() => setTab(tt.key)}>{t(tt.tk)}</button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-20">
+      <div className="flex-1 overflow-y-auto px-3 pt-2 pb-20">
         <FreeCoinsSection onFreeCoins={onFreeCoins} />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {items.map(item => {
             const owned = ownedIds.has(item.id);
             const equippedId = getEquippedId(item.type, allProps);
             const equipped = equippedId === item.id;
             const rarity = RARITY_COLORS[item.rarity];
-            const isLegendary = item.rarity === 'legendary';
+            const isPop = popId === item.id;
+            const isToast = equippedToast === item.id;
 
             return (
               <div
                 key={item.id}
-                className={`bg-card/50 border rounded-xl p-3 flex flex-col items-center gap-2 ${
-                  isLegendary ? 'border-yellow-500/40' : equipped ? 'border-primary/60' : 'border-border'
-                }`}
+                className={`relative bg-gradient-to-b from-card/60 to-card/30 border rounded-lg p-1.5 flex flex-col items-center gap-1 transition-all ${
+                  equipped ? 'border-primary/70 shadow-[0_0_12px_rgba(0,255,204,0.3)]' : `${rarity.border} ${rarity.glow}`
+                } ${isPop ? 'animate-scale-in' : ''}`}
               >
-                <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full ${rarity.bg} ${rarity.text} ${rarity.border} border`}>
-                  {rarity.label}
+                <span className={`text-[8px] font-mono px-1.5 py-[1px] rounded-full ${rarity.bg} ${rarity.text} ${rarity.border} border leading-none`}>
+                  {RARITY_LABEL[item.rarity]}
                 </span>
 
-                <ItemPreview item={item} />
+                <div className="scale-75 -my-1">
+                  <ItemPreview item={item} />
+                </div>
 
-                <p className="text-foreground font-mono text-xs text-center leading-tight">{item.name}</p>
+                <p className="text-foreground font-mono text-[9px] text-center leading-tight line-clamp-2 min-h-[2em]">{item.name}</p>
 
                 {equipped ? (
-                  <span className="text-primary text-xs font-mono">EQUIPPED</span>
+                  <span className="text-primary text-[8px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/10 border border-primary/40">{t('shop.equipped')}</span>
                 ) : owned ? (
                   <button
-                    onClick={() => onEquip(item)}
-                    className="text-xs font-mono px-3 py-1 rounded bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-all"
+                    onClick={() => {
+                      onEquip(item);
+                      setEquippedToast(item.id);
+                      setTimeout(() => setEquippedToast(null), 1200);
+                    }}
+                    className="text-[9px] font-mono px-2 py-0.5 rounded bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25 active:scale-95 transition-all"
                   >
-                    EQUIP
+                    {t('shop.equip')}
                   </button>
                 ) : (
                   <button
@@ -548,16 +566,26 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
                           localStorage.setItem('ownedItems', JSON.stringify([...next]));
                           return next;
                         });
+                        setPopId(item.id);
+                        setTimeout(() => setPopId(null), 350);
                       }
                     }}
-                    className={`text-xs font-mono px-3 py-1 rounded border transition-all ${
+                    className={`text-[9px] font-mono px-2 py-0.5 rounded border transition-all active:scale-95 ${
                       coins >= item.price
-                        ? (isLegendary ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/40 hover:bg-yellow-500/20' : 'bg-neon-yellow/10 text-neon-yellow border-neon-yellow/30 hover:bg-neon-yellow/20')
+                        ? (item.rarity === 'legendary'
+                            ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/50 hover:bg-yellow-500/25 hover:shadow-[0_0_8px_rgba(250,204,21,0.4)]'
+                            : 'bg-yellow-400/10 text-yellow-400 border-yellow-400/40 hover:bg-yellow-400/20')
                         : 'bg-muted/10 text-muted-foreground border-muted/30 cursor-not-allowed'
                     }`}
                   >
                     💰 {item.price}
                   </button>
+                )}
+
+                {isToast && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary text-primary-foreground shadow-[0_0_10px_rgba(0,255,204,0.6)] animate-fade-in">
+                    {t('shop.equippedToast')}
+                  </span>
                 )}
               </div>
             );
@@ -569,18 +597,15 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
 }
 
 function FreeCoinsSection({ onFreeCoins }: { onFreeCoins: (n: number) => void }) {
-  const [remaining, setRemaining] = useState<number>(getFreeCoinsRemaining());
+  const { t } = useT();
   const [mode, setMode] = useState<'idle' | 'loading' | 'fallback'>('idle');
 
   const grant = () => {
-    const reward = consumeFreeCoinSlot();
-    onFreeCoins(reward);
-    setRemaining(getFreeCoinsRemaining());
+    onFreeCoins(consumeFreeCoinSlot());
     setMode('idle');
   };
 
   const handleClick = async () => {
-    if (remaining <= 0) return;
     setMode('loading');
     try {
       const ok = await showRewarded(3000);
@@ -592,31 +617,26 @@ function FreeCoinsSection({ onFreeCoins }: { onFreeCoins: (n: number) => void })
   };
 
   return (
-    <div className="mb-4 p-3 rounded-xl border border-yellow-500/40 bg-yellow-500/5">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="font-mono text-xs text-yellow-400">🎁 FREE COINS</span>
-        <span className="font-mono text-[10px] text-muted-foreground">{remaining}/{FREE_COINS_MAX_PER_DAY} remaining today</span>
+    <div className="mb-3 p-2.5 rounded-xl border border-yellow-500/40 bg-gradient-to-r from-yellow-500/10 to-amber-500/5">
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <span className="font-mono text-[11px] text-yellow-400">🎁 FREE COINS</span>
+        <span className="font-mono text-[9px] text-yellow-300/70">+{FREE_COINS_PER_AD} per ad • unlimited</span>
       </div>
       {mode === 'idle' && (
         <button
           onClick={handleClick}
-          disabled={remaining <= 0}
-          className={`w-full px-3 py-2 font-mono text-xs rounded-lg border transition-all ${
-            remaining > 0
-              ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400 hover:bg-yellow-500/30'
-              : 'bg-muted/10 border-muted/30 text-muted-foreground cursor-not-allowed'
-          }`}
+          className="w-full px-3 py-1.5 font-mono text-[11px] rounded-lg border bg-yellow-500/20 border-yellow-500 text-yellow-400 hover:bg-yellow-500/30 active:scale-95 transition-all"
         >
-          🎬 {remaining > 0 ? `Watch ad for ${FREE_COINS_PER_AD} coins` : 'Vuelve mañana'}
+          🎬 Watch ad for {FREE_COINS_PER_AD} coins
         </button>
       )}
       {mode === 'loading' && (
-        <div className="flex justify-center py-2">
-          <div className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+        <div className="flex justify-center py-1.5">
+          <div className="w-6 h-6 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
       {mode === 'fallback' && (
-        <div className="flex justify-center py-1">
+        <div className="flex justify-center py-0.5">
           <RewardCountdown seconds={5} onComplete={grant} label={`+${FREE_COINS_PER_AD} coins...`} />
         </div>
       )}

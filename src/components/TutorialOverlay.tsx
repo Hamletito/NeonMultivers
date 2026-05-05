@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useT } from '../lib/i18n';
 
 interface Props {
   onComplete: () => void;
 }
 
 export default function TutorialOverlay({ onComplete }: Props) {
+  const { t } = useT();
   const [step, setStep] = useState(1);
   const [showCoin, setShowCoin] = useState(false);
 
@@ -24,11 +26,11 @@ export default function TutorialOverlay({ onComplete }: Props) {
   };
 
   const messages: Record<number, { title: string; sub?: string }> = {
-    1: { title: 'TOCA para saltar', sub: 'Toca la pantalla ahora' },
-    2: { title: '¡Bien! Salta los obstáculos', sub: 'Toca para continuar' },
-    3: { title: 'TOCA de nuevo en el aire\npara caer más rápido', sub: 'Toca para continuar' },
-    4: { title: 'Recoge monedas para comprar\nobjetos en la tienda', sub: showCoin ? '🪙 ¡Moneda recogida! Toca para continuar' : '' },
-    5: { title: 'Estás listo. Suerte.', sub: 'Toca para empezar' },
+    1: { title: t('tut.1'), sub: t('tut.1sub') },
+    2: { title: t('tut.2'), sub: t('tut.2sub') },
+    3: { title: t('tut.3'), sub: t('tut.3sub') },
+    4: { title: t('tut.4'), sub: showCoin ? t('tut.4got') : '' },
+    5: { title: t('tut.5'), sub: t('tut.5sub') },
   };
 
   const msg = messages[step];
@@ -56,7 +58,6 @@ export default function TutorialOverlay({ onComplete }: Props) {
         </div>
       )}
 
-      {/* Step indicator */}
       <div className="absolute bottom-8 flex gap-2">
         {[1, 2, 3, 4, 5].map(s => (
           <div key={s} className={`w-2 h-2 rounded-full ${s <= step ? 'bg-primary' : 'bg-white/20'}`} />
