@@ -491,28 +491,26 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
     })
     .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
 
-  const tabClass = (t: Tab) =>
-    `px-2.5 py-1 font-mono text-[10px] rounded-md transition-all whitespace-nowrap active:scale-95 ${tab === t
+  const tabClass = (k: Tab) =>
+    `px-2.5 py-1 font-mono text-[10px] rounded-md transition-all whitespace-nowrap active:scale-95 ${tab === k
       ? 'bg-primary/25 text-primary border border-primary shadow-[0_0_10px_rgba(0,255,204,0.3)]'
       : 'text-muted-foreground hover:text-foreground border border-transparent bg-card/30'}`;
 
   return (
     <div className="fixed inset-0 z-30 bg-gradient-to-b from-background via-background to-[#0a0a18] flex flex-col pointer-events-auto">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-primary/20 bg-background/60 backdrop-blur-sm">
         <button onClick={onBack} className="text-foreground/60 hover:text-foreground active:scale-95 transition-all">
           <ArrowLeft size={20} />
         </button>
-        <h2 className="text-base font-bold text-primary font-mono tracking-wider drop-shadow-[0_0_10px_rgba(0,255,204,0.4)]">⚡ SHOP</h2>
+        <h2 className="text-base font-bold text-primary font-mono tracking-wider drop-shadow-[0_0_10px_rgba(0,255,204,0.4)]">{t('shop.title')}</h2>
         <div className="text-yellow-400 font-mono text-xs flex items-center gap-1 bg-yellow-400/10 border border-yellow-400/30 rounded-full px-2.5 py-1">
           <span>💰</span><span className="font-bold">{coins}</span>
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 px-2 py-1.5 overflow-x-auto no-scrollbar border-b border-border/40">
-        {TABS.map(t => (
-          <button key={t.key} className={tabClass(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
+        {TABS.map(tt => (
+          <button key={tt.key} className={tabClass(tt.key)} onClick={() => setTab(tt.key)}>{t(tt.tk)}</button>
         ))}
       </div>
 
@@ -535,7 +533,7 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
                 } ${isPop ? 'animate-scale-in' : ''}`}
               >
                 <span className={`text-[8px] font-mono px-1.5 py-[1px] rounded-full ${rarity.bg} ${rarity.text} ${rarity.border} border leading-none`}>
-                  {rarity.label}
+                  {RARITY_LABEL[item.rarity]}
                 </span>
 
                 <div className="scale-75 -my-1">
