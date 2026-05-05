@@ -158,6 +158,14 @@ const Index = () => {
     setState(s => ({ ...s, settings }));
   }, []);
 
+  if (needsLang) {
+    return (
+      <div className="w-full h-screen overflow-hidden bg-background">
+        <LanguageSelectScreen onSelect={() => setLangChosen(true)} />
+      </div>
+    );
+  }
+
   if (needsProfile) {
     return (
       <>
