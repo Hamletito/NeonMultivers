@@ -25,7 +25,7 @@ export function setLang(l: Lang) {
   listeners.forEach(fn => fn());
 }
 
-const subscribe = (fn: () => void) => { listeners.add(fn); return () => listeners.delete(fn); };
+const subscribe = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
 const getSnapshot = () => currentLang;
 
 const DICT: Record<Lang, Record<string, string>> = {
