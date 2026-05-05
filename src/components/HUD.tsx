@@ -1,5 +1,6 @@
 import { GameState } from '../game/types';
 import { Pause, Zap, Settings } from 'lucide-react';
+import { useT } from '../lib/i18n';
 
 interface Props {
   state: GameState;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function HUD({ state, onPause, onActivatePower, onAdrenaline, onSettings }: Props) {
+  const { t } = useT();
   if (state.screen !== 'playing') return null;
 
   const hasActive = (type: string) => state.activePowers.some(p => p.type === type);

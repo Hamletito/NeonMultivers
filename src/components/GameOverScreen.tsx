@@ -61,24 +61,23 @@ export default function GameOverScreen({ state, onRevive, onMenu, onPlayAgain, o
       <div className="relative flex flex-col items-center gap-3 px-5 py-4 bg-gradient-to-b from-card/95 to-background/95 border border-destructive/40 rounded-2xl w-[300px] shadow-[0_0_50px_rgba(239,68,68,0.25)] animate-scale-in">
         {/* Dramatic title */}
         <h2 className="text-3xl font-extrabold text-destructive font-mono tracking-widest drop-shadow-[0_0_20px_rgba(239,68,68,0.7)] animate-pulse">
-          GAME OVER
+          {t('go.title')}
         </h2>
 
-        {/* Stats panel */}
         <div className="w-full grid grid-cols-2 gap-2">
           <div className="bg-background/60 border border-primary/30 rounded-lg py-2 text-center">
-            <p className="text-[9px] font-mono text-muted-foreground uppercase">Score</p>
+            <p className="text-[9px] font-mono text-muted-foreground uppercase">{t('go.score')}</p>
             <p className="text-primary font-mono text-xl font-bold">{state.score}</p>
           </div>
           <div className="bg-background/60 border border-yellow-400/30 rounded-lg py-2 text-center">
-            <p className="text-[9px] font-mono text-muted-foreground uppercase">Best</p>
+            <p className="text-[9px] font-mono text-muted-foreground uppercase">{t('go.best')}</p>
             <p className="text-yellow-400 font-mono text-xl font-bold">{state.bestScore}</p>
           </div>
         </div>
 
         {isNewBest && (
           <div className="px-3 py-1 bg-yellow-400/20 border border-yellow-400 rounded-full">
-            <p className="text-yellow-400 text-[10px] font-mono font-bold animate-pulse">⭐ NEW BEST! ⭐</p>
+            <p className="text-yellow-400 text-[10px] font-mono font-bold animate-pulse">{t('go.newBest')}</p>
           </div>
         )}
 
@@ -87,27 +86,26 @@ export default function GameOverScreen({ state, onRevive, onMenu, onPlayAgain, o
           {doubled && <span className="text-yellow-300 font-bold">×2!</span>}
         </div>
 
-        {/* Action area */}
         {mode === 'revive-loading' && (
           <div className="flex flex-col items-center gap-1.5 py-1">
             <div className="w-8 h-8 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
-            <p className="text-muted-foreground text-[10px] font-mono">Loading ad...</p>
+            <p className="text-muted-foreground text-[10px] font-mono">{t('go.loadingAd')}</p>
           </div>
         )}
         {mode === 'revive-fallback' && (
-          <RewardCountdown seconds={5} onComplete={onRevive} label="Reviving..." />
+          <RewardCountdown seconds={5} onComplete={onRevive} label={t('go.reviving')} />
         )}
         {mode === 'double-loading' && (
           <div className="flex flex-col items-center gap-1.5 py-1">
             <div className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
-            <p className="text-muted-foreground text-[10px] font-mono">Loading ad...</p>
+            <p className="text-muted-foreground text-[10px] font-mono">{t('go.loadingAd')}</p>
           </div>
         )}
         {mode === 'double-fallback' && (
           <RewardCountdown
             seconds={5}
             onComplete={() => { setDoubled(true); onDoubleCoins(earned); setMode('idle'); }}
-            label="Doubling coins..."
+            label={t('go.doubling')}
           />
         )}
 
@@ -117,7 +115,7 @@ export default function GameOverScreen({ state, onRevive, onMenu, onPlayAgain, o
               onClick={tryRevive}
               className="px-4 py-2 bg-gradient-to-r from-green-500/30 to-emerald-500/30 border border-green-400 text-green-300 font-mono rounded-lg text-sm font-bold hover:from-green-500/40 hover:to-emerald-500/40 hover:shadow-[0_0_18px_rgba(74,222,128,0.5)] active:scale-95 transition-all"
             >
-              💚 {canFreeRevive ? 'FREE REVIVE' : 'REVIVE (Watch Ad)'}
+              {canFreeRevive ? t('go.freeRevive') : t('go.reviveAd')}
             </button>
 
             {!doubled && !state.doubledCoinsUsed && earned > 0 && (
@@ -125,7 +123,7 @@ export default function GameOverScreen({ state, onRevive, onMenu, onPlayAgain, o
                 onClick={tryDouble}
                 className="px-4 py-2 bg-gradient-to-r from-yellow-500/30 to-amber-500/30 border border-yellow-400 text-yellow-300 font-mono rounded-lg text-sm font-bold hover:from-yellow-500/40 hover:to-amber-500/40 hover:shadow-[0_0_18px_rgba(250,204,21,0.5)] active:scale-95 transition-all"
               >
-                💰 2X COINS
+                {t('go.doubleCoins')}
               </button>
             )}
 
@@ -133,14 +131,14 @@ export default function GameOverScreen({ state, onRevive, onMenu, onPlayAgain, o
               onClick={onPlayAgain}
               className="px-4 py-2 bg-primary/20 border border-primary text-primary font-mono rounded-lg text-sm font-bold hover:bg-primary/30 hover:shadow-[0_0_18px_rgba(0,255,204,0.5)] active:scale-95 transition-all"
             >
-              ▶ PLAY AGAIN
+              {t('go.playAgain')}
             </button>
 
             <button
               onClick={onMenu}
               className="px-3 py-1.5 text-muted-foreground text-[11px] font-mono hover:text-foreground active:scale-95 transition-all"
             >
-              MENU
+              {t('go.menu')}
             </button>
           </div>
         )}
