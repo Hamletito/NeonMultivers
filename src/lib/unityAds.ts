@@ -133,26 +133,10 @@ if (typeof document !== 'undefined') {
   });
 }
 
-// ---- Daily free-coin counter ----
-const FREE_COINS_LIMIT = 5;
-const FREE_COINS_REWARD = 25;
-
-function todayKey(): string {
-  const d = new Date();
-  return `freeCoinsCount_${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-}
-export function getFreeCoinsRemaining(): number {
-  const used = parseInt(localStorage.getItem(todayKey()) || '0', 10);
-  return Math.max(0, FREE_COINS_LIMIT - used);
-}
-export function consumeFreeCoinSlot(): number {
-  const k = todayKey();
-  const used = parseInt(localStorage.getItem(k) || '0', 10) + 1;
-  localStorage.setItem(k, String(used));
-  return FREE_COINS_REWARD;
-}
+// ---- Free-coin reward (no daily limit) ----
+const FREE_COINS_REWARD = 15;
+export function consumeFreeCoinSlot(): number { return FREE_COINS_REWARD; }
 export const FREE_COINS_PER_AD = FREE_COINS_REWARD;
-export const FREE_COINS_MAX_PER_DAY = FREE_COINS_LIMIT;
 
 // ---- Game-over interstitial cadence ----
 export function shouldShowGameOverInterstitial(): boolean {

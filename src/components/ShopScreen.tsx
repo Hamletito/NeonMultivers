@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { SHOP_ITEMS } from '../game/constants';
 import { ShopItem } from '../game/types';
 import { ArrowLeft } from 'lucide-react';
-import { showRewarded, getFreeCoinsRemaining, consumeFreeCoinSlot, FREE_COINS_PER_AD, FREE_COINS_MAX_PER_DAY } from '../lib/unityAds';
+import { showRewarded, consumeFreeCoinSlot, FREE_COINS_PER_AD } from '../lib/unityAds';
 import RewardCountdown from './RewardCountdown';
 
 interface Props {
@@ -569,18 +569,14 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
 }
 
 function FreeCoinsSection({ onFreeCoins }: { onFreeCoins: (n: number) => void }) {
-  const [remaining, setRemaining] = useState<number>(getFreeCoinsRemaining());
   const [mode, setMode] = useState<'idle' | 'loading' | 'fallback'>('idle');
 
   const grant = () => {
-    const reward = consumeFreeCoinSlot();
-    onFreeCoins(reward);
-    setRemaining(getFreeCoinsRemaining());
+    onFreeCoins(consumeFreeCoinSlot());
     setMode('idle');
   };
 
   const handleClick = async () => {
-    if (remaining <= 0) return;
     setMode('loading');
     try {
       const ok = await showRewarded(3000);
@@ -592,31 +588,26 @@ function FreeCoinsSection({ onFreeCoins }: { onFreeCoins: (n: number) => void })
   };
 
   return (
-    <div className="mb-4 p-3 rounded-xl border border-yellow-500/40 bg-yellow-500/5">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="font-mono text-xs text-yellow-400">🎁 FREE COINS</span>
-        <span className="font-mono text-[10px] text-muted-foreground">{remaining}/{FREE_COINS_MAX_PER_DAY} remaining today</span>
+    <div className="mb-3 p-2.5 rounded-xl border border-yellow-500/40 bg-gradient-to-r from-yellow-500/10 to-amber-500/5">
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <span className="font-mono text-[11px] text-yellow-400">🎁 FREE COINS</span>
+        <span className="font-mono text-[9px] text-yellow-300/70">+{FREE_COINS_PER_AD} per ad • unlimited</span>
       </div>
       {mode === 'idle' && (
         <button
           onClick={handleClick}
-          disabled={remaining <= 0}
-          className={`w-full px-3 py-2 font-mono text-xs rounded-lg border transition-all ${
-            remaining > 0
-              ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400 hover:bg-yellow-500/30'
-              : 'bg-muted/10 border-muted/30 text-muted-foreground cursor-not-allowed'
-          }`}
+          className="w-full px-3 py-1.5 font-mono text-[11px] rounded-lg border bg-yellow-500/20 border-yellow-500 text-yellow-400 hover:bg-yellow-500/30 active:scale-95 transition-all"
         >
-          🎬 {remaining > 0 ? `Watch ad for ${FREE_COINS_PER_AD} coins` : 'Vuelve mañana'}
+          🎬 Watch ad for {FREE_COINS_PER_AD} coins
         </button>
       )}
       {mode === 'loading' && (
-        <div className="flex justify-center py-2">
-          <div className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+        <div className="flex justify-center py-1.5">
+          <div className="w-6 h-6 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
       {mode === 'fallback' && (
-        <div className="flex justify-center py-1">
+        <div className="flex justify-center py-0.5">
           <RewardCountdown seconds={5} onComplete={grant} label={`+${FREE_COINS_PER_AD} coins...`} />
         </div>
       )}
