@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GameState } from '../game/types';
 import { showRewarded } from '../lib/unityAds';
+import { useT } from '../lib/i18n';
 import RewardCountdown from './RewardCountdown';
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
 type Mode = 'idle' | 'revive-loading' | 'revive-fallback' | 'double-loading' | 'double-fallback';
 
 export default function GameOverScreen({ state, onRevive, onMenu, onPlayAgain, onDoubleCoins }: Props) {
+  const { t } = useT();
   const [mode, setMode] = useState<Mode>('idle');
   const [doubled, setDoubled] = useState(false);
 
