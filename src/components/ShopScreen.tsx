@@ -33,11 +33,11 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'powerups', label: 'Power' },
 ];
 
-const RARITY_COLORS: Record<string, { bg: string; text: string; border: string; label: string }> = {
-  common: { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/40', label: 'Common' },
-  rare: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/40', label: 'Rare' },
-  epic: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/40', label: 'Epic' },
-  legendary: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/40', label: 'Legendary' },
+const RARITY_COLORS: Record<string, { bg: string; text: string; border: string; glow: string; label: string }> = {
+  common:    { bg: 'bg-gray-500/15',   text: 'text-gray-300',   border: 'border-gray-500/40',   glow: '',                                         label: 'Common' },
+  rare:      { bg: 'bg-blue-500/15',   text: 'text-blue-300',   border: 'border-blue-500/50',   glow: 'shadow-[0_0_12px_rgba(59,130,246,0.25)]',  label: 'Rare' },
+  epic:      { bg: 'bg-purple-500/15', text: 'text-purple-300', border: 'border-purple-500/50', glow: 'shadow-[0_0_14px_rgba(168,85,247,0.3)]',   label: 'Epic' },
+  legendary: { bg: 'bg-yellow-500/15', text: 'text-yellow-300', border: 'border-yellow-500/60', glow: 'shadow-[0_0_18px_rgba(250,204,21,0.4)]',   label: 'Legendary' },
 };
 
 const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary'];
@@ -466,6 +466,8 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
     const saved = localStorage.getItem('ownedItems');
     return saved ? new Set(JSON.parse(saved)) : new Set(SHOP_ITEMS.filter(i => i.owned).map(i => i.id));
   });
+  const [popId, setPopId] = useState<string | null>(null);
+  const [equippedToast, setEquippedToast] = useState<string | null>(null);
 
   const items = SHOP_ITEMS
     .filter(i => {
@@ -481,59 +483,68 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
     .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
 
   const tabClass = (t: Tab) =>
-    `px-2.5 py-1.5 font-mono text-[10px] rounded-lg transition-all whitespace-nowrap ${tab === t
-      ? 'bg-primary/20 text-primary border border-primary'
-      : 'text-muted-foreground hover:text-foreground border border-transparent'}`;
+    `px-2.5 py-1 font-mono text-[10px] rounded-md transition-all whitespace-nowrap active:scale-95 ${tab === t
+      ? 'bg-primary/25 text-primary border border-primary shadow-[0_0_10px_rgba(0,255,204,0.3)]'
+      : 'text-muted-foreground hover:text-foreground border border-transparent bg-card/30'}`;
 
   return (
-    <div className="fixed inset-0 z-30 bg-background flex flex-col pointer-events-auto">
-      <div className="flex items-center justify-between p-4">
-        <button onClick={onBack} className="text-foreground/60 hover:text-foreground transition-colors">
-          <ArrowLeft size={24} />
+    <div className="fixed inset-0 z-30 bg-gradient-to-b from-background via-background to-[#0a0a18] flex flex-col pointer-events-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-primary/20 bg-background/60 backdrop-blur-sm">
+        <button onClick={onBack} className="text-foreground/60 hover:text-foreground active:scale-95 transition-all">
+          <ArrowLeft size={20} />
         </button>
-        <h2 className="text-xl font-bold text-primary font-mono">SHOP</h2>
-        <div className="text-neon-yellow font-mono text-sm flex items-center gap-1">
-          <span>💰</span>{coins}
+        <h2 className="text-base font-bold text-primary font-mono tracking-wider drop-shadow-[0_0_10px_rgba(0,255,204,0.4)]">⚡ SHOP</h2>
+        <div className="text-yellow-400 font-mono text-xs flex items-center gap-1 bg-yellow-400/10 border border-yellow-400/30 rounded-full px-2.5 py-1">
+          <span>💰</span><span className="font-bold">{coins}</span>
         </div>
       </div>
 
-      <div className="flex gap-1.5 px-3 mb-3 overflow-x-auto no-scrollbar">
+      {/* Tabs */}
+      <div className="flex gap-1 px-2 py-1.5 overflow-x-auto no-scrollbar border-b border-border/40">
         {TABS.map(t => (
           <button key={t.key} className={tabClass(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-20">
+      <div className="flex-1 overflow-y-auto px-3 pt-2 pb-20">
         <FreeCoinsSection onFreeCoins={onFreeCoins} />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {items.map(item => {
             const owned = ownedIds.has(item.id);
             const equippedId = getEquippedId(item.type, allProps);
             const equipped = equippedId === item.id;
             const rarity = RARITY_COLORS[item.rarity];
-            const isLegendary = item.rarity === 'legendary';
+            const isPop = popId === item.id;
+            const isToast = equippedToast === item.id;
 
             return (
               <div
                 key={item.id}
-                className={`bg-card/50 border rounded-xl p-3 flex flex-col items-center gap-2 ${
-                  isLegendary ? 'border-yellow-500/40' : equipped ? 'border-primary/60' : 'border-border'
-                }`}
+                className={`relative bg-gradient-to-b from-card/60 to-card/30 border rounded-lg p-1.5 flex flex-col items-center gap-1 transition-all ${
+                  equipped ? 'border-primary/70 shadow-[0_0_12px_rgba(0,255,204,0.3)]' : `${rarity.border} ${rarity.glow}`
+                } ${isPop ? 'animate-scale-in' : ''}`}
               >
-                <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full ${rarity.bg} ${rarity.text} ${rarity.border} border`}>
+                <span className={`text-[8px] font-mono px-1.5 py-[1px] rounded-full ${rarity.bg} ${rarity.text} ${rarity.border} border leading-none`}>
                   {rarity.label}
                 </span>
 
-                <ItemPreview item={item} />
+                <div className="scale-75 -my-1">
+                  <ItemPreview item={item} />
+                </div>
 
-                <p className="text-foreground font-mono text-xs text-center leading-tight">{item.name}</p>
+                <p className="text-foreground font-mono text-[9px] text-center leading-tight line-clamp-2 min-h-[2em]">{item.name}</p>
 
                 {equipped ? (
-                  <span className="text-primary text-xs font-mono">EQUIPPED</span>
+                  <span className="text-primary text-[8px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/10 border border-primary/40">EQUIPPED</span>
                 ) : owned ? (
                   <button
-                    onClick={() => onEquip(item)}
-                    className="text-xs font-mono px-3 py-1 rounded bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-all"
+                    onClick={() => {
+                      onEquip(item);
+                      setEquippedToast(item.id);
+                      setTimeout(() => setEquippedToast(null), 1200);
+                    }}
+                    className="text-[9px] font-mono px-2 py-0.5 rounded bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25 active:scale-95 transition-all"
                   >
                     EQUIP
                   </button>
@@ -548,16 +559,26 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
                           localStorage.setItem('ownedItems', JSON.stringify([...next]));
                           return next;
                         });
+                        setPopId(item.id);
+                        setTimeout(() => setPopId(null), 350);
                       }
                     }}
-                    className={`text-xs font-mono px-3 py-1 rounded border transition-all ${
+                    className={`text-[9px] font-mono px-2 py-0.5 rounded border transition-all active:scale-95 ${
                       coins >= item.price
-                        ? (isLegendary ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/40 hover:bg-yellow-500/20' : 'bg-neon-yellow/10 text-neon-yellow border-neon-yellow/30 hover:bg-neon-yellow/20')
+                        ? (item.rarity === 'legendary'
+                            ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/50 hover:bg-yellow-500/25 hover:shadow-[0_0_8px_rgba(250,204,21,0.4)]'
+                            : 'bg-yellow-400/10 text-yellow-400 border-yellow-400/40 hover:bg-yellow-400/20')
                         : 'bg-muted/10 text-muted-foreground border-muted/30 cursor-not-allowed'
                     }`}
                   >
                     💰 {item.price}
                   </button>
+                )}
+
+                {isToast && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary text-primary-foreground shadow-[0_0_10px_rgba(0,255,204,0.6)] animate-fade-in">
+                    Equipped!
+                  </span>
                 )}
               </div>
             );
