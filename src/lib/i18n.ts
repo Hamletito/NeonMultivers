@@ -307,5 +307,8 @@ export function useT() {
 // Force re-render hack for non-hook callers (rarely needed).
 export function useLangVersion() {
   const [, setN] = useState(0);
-  useEffect(() => subscribe(() => setN(n => n + 1)), []);
+  useEffect(() => {
+    const unsub = subscribe(() => setN(n => n + 1));
+    return () => { unsub; };
+  }, []);
 }
