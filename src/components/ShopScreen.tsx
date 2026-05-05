@@ -597,6 +597,7 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
 }
 
 function FreeCoinsSection({ onFreeCoins }: { onFreeCoins: (n: number) => void }) {
+  const { t } = useT();
   const [mode, setMode] = useState<'idle' | 'loading' | 'fallback'>('idle');
 
   const grant = () => {
