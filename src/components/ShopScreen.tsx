@@ -3,6 +3,7 @@ import { SHOP_ITEMS } from '../game/constants';
 import { ShopItem } from '../game/types';
 import { ArrowLeft } from 'lucide-react';
 import { showRewarded, consumeFreeCoinSlot, FREE_COINS_PER_AD } from '../lib/unityAds';
+import { useT } from '../lib/i18n';
 import RewardCountdown from './RewardCountdown';
 
 interface Props {
@@ -23,14 +24,14 @@ interface Props {
 
 type Tab = 'skins' | 'trails' | 'death' | 'jump' | 'backgrounds' | 'floor' | 'powerups';
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'skins', label: 'Skins' },
-  { key: 'trails', label: 'Trails' },
-  { key: 'death', label: 'Death' },
-  { key: 'jump', label: 'Jump' },
-  { key: 'backgrounds', label: 'BG' },
-  { key: 'floor', label: 'Floor' },
-  { key: 'powerups', label: 'Power' },
+const TABS: { key: Tab; tk: string }[] = [
+  { key: 'skins', tk: 'shop.tab.skins' },
+  { key: 'trails', tk: 'shop.tab.trails' },
+  { key: 'death', tk: 'shop.tab.death' },
+  { key: 'jump', tk: 'shop.tab.jump' },
+  { key: 'backgrounds', tk: 'shop.tab.backgrounds' },
+  { key: 'floor', tk: 'shop.tab.floor' },
+  { key: 'powerups', tk: 'shop.tab.powerups' },
 ];
 
 const RARITY_COLORS: Record<string, { bg: string; text: string; border: string; glow: string; label: string }> = {
@@ -460,6 +461,7 @@ function drawStarShape(ctx: CanvasRenderingContext2D, cx: number, cy: number, sp
 }
 
 export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack, onFreeCoins }: Props) {
+  const { t } = useT();
   const allProps = { coins, removeAds, equippedSkin, equippedTrail, equippedDeath, equippedJump, equippedBackground, equippedFloor, onBuy, onEquip, onRemoveAds, onBack, onFreeCoins };
   const [tab, setTab] = useState<Tab>('skins');
   const [ownedIds, setOwnedIds] = useState<Set<string>>(() => {
@@ -468,6 +470,13 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
   });
   const [popId, setPopId] = useState<string | null>(null);
   const [equippedToast, setEquippedToast] = useState<string | null>(null);
+
+  const RARITY_LABEL: Record<string, string> = {
+    common: t('shop.rarity.common'),
+    rare: t('shop.rarity.rare'),
+    epic: t('shop.rarity.epic'),
+    legendary: t('shop.rarity.legendary'),
+  };
 
   const items = SHOP_ITEMS
     .filter(i => {
