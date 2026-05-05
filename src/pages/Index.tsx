@@ -187,6 +187,7 @@ const Index = () => {
           state={state}
           onRevive={handleRevive}
           onMenu={handleMenu}
+          onPlayAgain={handlePlay}
           onDoubleCoins={(extra) => setState(s => {
             if (s.doubledCoinsUsed) return s;
             const newTotal = s.totalCoins + extra;

@@ -50,11 +50,6 @@ export default function InGameSettings({ settings, onUpdate, onClose }: Props) {
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-foreground font-mono text-[10px]">📳 Vibración de pantalla</span>
-          <Switch checked={settings.screenShakeEnabled} onCheckedChange={v => update({ screenShakeEnabled: v })} />
-        </div>
-
-        <div className="flex items-center justify-between">
           <span className="text-foreground font-mono text-[10px]">✨ Partículas</span>
           <Switch checked={settings.particlesEnabled} onCheckedChange={v => update({ particlesEnabled: v })} />
         </div>
