@@ -543,7 +543,7 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
                 <p className="text-foreground font-mono text-[9px] text-center leading-tight line-clamp-2 min-h-[2em]">{item.name}</p>
 
                 {equipped ? (
-                  <span className="text-primary text-[8px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/10 border border-primary/40">EQUIPPED</span>
+                  <span className="text-primary text-[8px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/10 border border-primary/40">{t('shop.equipped')}</span>
                 ) : owned ? (
                   <button
                     onClick={() => {
@@ -553,7 +553,7 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
                     }}
                     className="text-[9px] font-mono px-2 py-0.5 rounded bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25 active:scale-95 transition-all"
                   >
-                    EQUIP
+                    {t('shop.equip')}
                   </button>
                 ) : (
                   <button
@@ -584,7 +584,7 @@ export default function ShopScreen({ coins, removeAds, equippedSkin, equippedTra
 
                 {isToast && (
                   <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary text-primary-foreground shadow-[0_0_10px_rgba(0,255,204,0.6)] animate-fade-in">
-                    Equipped!
+                    {t('shop.equippedToast')}
                   </span>
                 )}
               </div>
