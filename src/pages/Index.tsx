@@ -221,7 +221,13 @@ const Index = () => {
           />
         )}
         {state.screen === 'settings' && (
-          <SettingsScreen settings={state.settings} onUpdate={handleUpdateSettings} onBack={handleMenu} />
+          <SettingsScreen
+            settings={state.settings}
+            onUpdate={handleUpdateSettings}
+            onBack={handleMenu}
+            coins={state.totalCoins}
+            onCoinsChange={(c) => setState(s => ({ ...s, coins: c, totalCoins: c }))}
+          />
         )}
         <BannerAd />
       </div>
