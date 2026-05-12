@@ -13,7 +13,7 @@ try {
 
 // Initialize Unity Ads (no-op on plain web; only acts inside Capacitor Android WebView)
 try {
-  initUnityAds().then(() => startBannerWatchdog()).catch(() => {});
+  initAds().then(() => startBannerWatchdog()).catch(() => {});
 } catch {}
 
 createRoot(document.getElementById("root")!).render(<App />);
