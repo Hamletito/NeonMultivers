@@ -14,7 +14,7 @@ import LanguageSelectScreen from '../components/LanguageSelectScreen';
 import { GameState, ShopItem, GameSettings, PlayerProfile } from '../game/types';
 import { createInitialState, resetForNewGame, activateAdrenaline } from '../game/engine';
 import { toggleMute, isMuted, startMusic, stopMusic, setMasterVolume, setSfxEnabled, setMusicEnabled } from '../game/audio';
-import { showInterstitial, shouldShowGameOverInterstitial } from '../lib/ads';
+import { maybeShowTransitionInterstitial } from '../lib/ads';
 import { isLangChosen, useT } from '../lib/i18n';
 import BannerAd from '../components/BannerAd';
 
@@ -40,11 +40,11 @@ const Index = () => {
   const needsProfile = !profile?.created;
   const needsTutorial = profile?.created && localStorage.getItem('tutorialDone') !== 'true';
 
-  // Show interstitial every 2nd game over (fire-and-forget; never blocks game over screen).
+  // Random interstitial on screen transitions (never during active gameplay).
+  // Cooldown handled inside maybeShowTransitionInterstitial (3 min minimum gap).
   useEffect(() => {
-    if (state.screen !== 'gameover') return;
-    if (!shouldShowGameOverInterstitial()) return;
-    showInterstitial(3000).catch(() => {});
+    if (state.screen === 'playing' || state.screen === 'paused') return;
+    maybeShowTransitionInterstitial();
   }, [state.screen]);
 
   const handlePlay = useCallback(() => {
