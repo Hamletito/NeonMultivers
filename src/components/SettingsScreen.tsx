@@ -59,7 +59,6 @@ export default function SettingsScreen({ settings, onUpdate, onBack, coins, onCo
     { key: 'audio' as const, tk: 'set.tab.audio' },
     { key: 'graphics' as const, tk: 'set.tab.graphics' },
     { key: 'gameplay' as const, tk: 'set.tab.gameplay' },
-    { key: 'account' as const, tk: 'set.tab.account' },
     { key: 'about' as const, tk: 'set.tab.about' },
   ];
 
