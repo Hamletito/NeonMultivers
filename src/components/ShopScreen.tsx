@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { SHOP_ITEMS } from '../game/constants';
 import { ShopItem } from '../game/types';
 import { ArrowLeft } from 'lucide-react';
-import { showRewarded, consumeFreeCoinSlot, FREE_COINS_PER_AD } from '../lib/unityAds';
+import { showRewarded, consumeFreeCoinSlot, FREE_COINS_PER_AD } from '../lib/ads';
 import { useT } from '../lib/i18n';
 import RewardCountdown from './RewardCountdown';
 

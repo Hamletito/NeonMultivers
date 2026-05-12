@@ -14,7 +14,7 @@ import LanguageSelectScreen from '../components/LanguageSelectScreen';
 import { GameState, ShopItem, GameSettings, PlayerProfile } from '../game/types';
 import { createInitialState, resetForNewGame, activateAdrenaline } from '../game/engine';
 import { toggleMute, isMuted, startMusic, stopMusic, setMasterVolume, setSfxEnabled, setMusicEnabled } from '../game/audio';
-import { showInterstitial, shouldShowGameOverInterstitial } from '../lib/unityAds';
+import { showInterstitial, shouldShowGameOverInterstitial } from '../lib/ads';
 import { isLangChosen, useT } from '../lib/i18n';
 import BannerAd from '../components/BannerAd';
 
