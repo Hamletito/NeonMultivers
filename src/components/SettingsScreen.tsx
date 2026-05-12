@@ -20,7 +20,7 @@ export default function SettingsScreen({ settings, onUpdate, onBack, coins, onCo
   const [s, setS] = useState<GameSettings>({ ...settings });
   const [resetConfirm, setResetConfirm] = useState(false);
   const [resetText, setResetText] = useState('');
-  const [tab, setTab] = useState<'audio' | 'graphics' | 'gameplay' | 'account' | 'about'>('audio');
+  const [tab, setTab] = useState<'audio' | 'graphics' | 'gameplay' | 'about'>('audio');
   const [editingName, setEditingName] = useState(false);
   const [pendingName, setPendingName] = useState(s.playerName);
   const [showNameConfirm, setShowNameConfirm] = useState(false);
