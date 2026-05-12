@@ -20,7 +20,7 @@ export default function SettingsScreen({ settings, onUpdate, onBack, coins, onCo
   const [s, setS] = useState<GameSettings>({ ...settings });
   const [resetConfirm, setResetConfirm] = useState(false);
   const [resetText, setResetText] = useState('');
-  const [tab, setTab] = useState<'audio' | 'graphics' | 'gameplay' | 'account' | 'about'>('audio');
+  const [tab, setTab] = useState<'audio' | 'graphics' | 'gameplay' | 'about'>('audio');
   const [editingName, setEditingName] = useState(false);
   const [pendingName, setPendingName] = useState(s.playerName);
   const [showNameConfirm, setShowNameConfirm] = useState(false);
@@ -59,7 +59,6 @@ export default function SettingsScreen({ settings, onUpdate, onBack, coins, onCo
     { key: 'audio' as const, tk: 'set.tab.audio' },
     { key: 'graphics' as const, tk: 'set.tab.graphics' },
     { key: 'gameplay' as const, tk: 'set.tab.gameplay' },
-    { key: 'account' as const, tk: 'set.tab.account' },
     { key: 'about' as const, tk: 'set.tab.about' },
   ];
 
@@ -130,44 +129,7 @@ export default function SettingsScreen({ settings, onUpdate, onBack, coins, onCo
           </div>
         )}
 
-        {tab === 'account' && (
-          <div className="space-y-5">
-            <div>
-              <label className="text-foreground font-mono text-xs mb-1 block">{t('set.playerName')}</label>
-              {!editingName ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-card border border-border rounded-lg px-3 py-2 font-mono text-sm text-foreground">{s.playerName || 'Runner'}</div>
-                  <button onClick={startEditName} className="px-3 py-2 bg-primary/20 border border-primary text-primary font-mono text-xs rounded-lg hover:bg-primary/30 active:scale-95 transition-all">{t('set.edit')}</button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <input type="text" value={pendingName} onChange={(e) => setPendingName(e.target.value.replace(/\s/g, '').slice(0, 15))} maxLength={15} autoFocus
-                    className="w-full bg-card border border-border rounded-lg px-3 py-2 font-mono text-sm text-foreground focus:outline-none focus:border-primary" placeholder="Runner" />
-                  <div className="flex gap-2">
-                    <button onClick={() => { setEditingName(false); setNameError(null); }} className="flex-1 px-3 py-2 border border-border text-muted-foreground font-mono text-xs rounded-lg hover:text-foreground active:scale-95 transition-all">{t('set.cancel')}</button>
-                    <button onClick={requestNameChange} disabled={!pendingName || pendingName === s.playerName}
-                      className="flex-1 px-3 py-2 bg-yellow-500/20 border border-yellow-500 text-yellow-400 font-mono text-xs rounded-lg hover:bg-yellow-500/30 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed">{t('set.save')}</button>
-                  </div>
-                  {nameError && <p className="text-destructive font-mono text-[10px] text-center">{nameError}</p>}
-                </div>
-              )}
-            </div>
 
-            {!resetConfirm ? (
-              <button onClick={() => setResetConfirm(true)} className="w-full px-4 py-2 bg-destructive/20 border border-destructive text-destructive font-mono text-xs rounded-lg hover:bg-destructive/30 active:scale-95 transition-all">{t('set.reset')}</button>
-            ) : (
-              <div className="p-4 bg-card/50 border border-destructive rounded-xl space-y-3">
-                <p className="text-destructive font-mono text-xs text-center">{t('set.resetConfirm')}</p>
-                <p className="text-muted-foreground font-mono text-[10px] text-center">{t('set.resetType')}</p>
-                <input type="text" value={resetText} onChange={(e) => setResetText(e.target.value.toUpperCase())} className="w-full bg-card border border-destructive/50 rounded-lg px-3 py-2 font-mono text-sm text-foreground focus:outline-none focus:border-destructive text-center" placeholder="RESET" />
-                <div className="flex gap-2">
-                  <button onClick={() => { setResetConfirm(false); setResetText(''); }} className="flex-1 px-3 py-2 border border-border text-muted-foreground font-mono text-xs rounded-lg hover:text-foreground active:scale-95 transition-all">{t('set.cancel')}</button>
-                  <button onClick={handleReset} disabled={resetText !== 'RESET'} className={`flex-1 px-3 py-2 font-mono text-xs rounded-lg transition-all active:scale-95 ${resetText === 'RESET' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/80' : 'bg-muted text-muted-foreground cursor-not-allowed'}`}>{t('set.confirm')}</button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {tab === 'about' && (
           <div className="space-y-3 text-center">
