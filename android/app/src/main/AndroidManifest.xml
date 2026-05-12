@@ -2,7 +2,7 @@
 <!--
   NeonMultiverse — Android Manifest reference.
   Copy/merge into android/app/src/main/AndroidManifest.xml after `npx cap add android`.
-  Key bits: landscape lock, INTERNET + ACCESS_NETWORK_STATE permissions for Unity Ads.
+  Key bits: landscape lock, INTERNET + ACCESS_NETWORK_STATE permissions, Google AdMob APP ID.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -16,6 +16,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+
+        <!-- Google AdMob App ID -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-1288760910461542~2264892214" />
 
         <activity
             android:name=".MainActivity"
