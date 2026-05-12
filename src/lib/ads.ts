@@ -14,7 +14,6 @@ import {
   BannerAdSize,
   AdmobConsentStatus,
   RewardAdPluginEvents,
-  InterstitialAdPluginEvents,
 } from '@capacitor-community/admob';
 
 export const AD_UNITS = {
