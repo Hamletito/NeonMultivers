@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { initUnityAds, startBannerWatchdog } from "./lib/unityAds";
+import { initAds, startBannerWatchdog } from "./lib/ads";
 
 // Best-effort attempt to lock landscape on mobile (silently ignored on desktop / unsupported browsers)
 try {
