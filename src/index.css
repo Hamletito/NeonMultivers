@@ -44,6 +44,9 @@ All colors MUST be HSL.
     --neon-yellow: 50 100% 55%;
     --neon-green: 140 100% 50%;
 
+    /* Banner ad height — every screen reserves this much at the bottom. */
+    --banner-height: 60px;
+
     --sidebar-background: 230 40% 8%;
     --sidebar-foreground: 220 20% 90%;
     --sidebar-primary: 170 100% 50%;
@@ -65,35 +68,33 @@ All colors MUST be HSL.
   }
 }
 
-/* Mobile landscape rotation prompt */
-.rotate-prompt { display: none; }
-@media (max-width: 900px) and (orientation: portrait) {
-  .rotate-prompt {
-    display: flex;
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    background: hsl(var(--background));
-    color: hsl(var(--foreground));
-    padding: 2rem;
-    text-align: center;
-    gap: 1rem;
-  }
-  .rotate-prompt .icon {
-    font-size: 4rem;
-    animation: rotate-hint 2s ease-in-out infinite;
-  }
-  .rotate-app-content { display: none !important; }
-}
-@keyframes rotate-hint {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(90deg); }
-}
-
 /* Hide scrollbars */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* Splash screen animations */
+@keyframes splash-letter {
+  0%   { opacity: 0; transform: translateY(20px) scale(0.6); filter: blur(8px); }
+  60%  { opacity: 1; transform: translateY(0) scale(1.05); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes splash-sweep {
+  0%   { transform: translateX(-110%); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(110%); opacity: 0; }
+}
+@keyframes splash-shatter {
+  0%   { opacity: 1; transform: scale(1); filter: brightness(1); }
+  60%  { opacity: 1; transform: scale(1.06); filter: brightness(2.2); }
+  100% { opacity: 0; transform: scale(1.4); filter: brightness(3) blur(6px); }
+}
+@keyframes splash-pulse-bg {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%      { opacity: 0.9; transform: scale(1.15); }
+}
+.splash-letter {
+  display: inline-block;
+  opacity: 0;
+  animation: splash-letter 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}

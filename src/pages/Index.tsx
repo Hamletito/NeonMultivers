@@ -17,6 +17,7 @@ import { toggleMute, isMuted, startMusic, stopMusic, setMasterVolume, setSfxEnab
 import { maybeShowTransitionInterstitial } from '../lib/ads';
 import { isLangChosen, useT } from '../lib/i18n';
 import BannerAd from '../components/BannerAd';
+import SplashScreen from '../components/SplashScreen';
 
 function loadProfile(): PlayerProfile | null {
   try {
@@ -35,6 +36,8 @@ const Index = () => {
   const [showTutorial, setShowTutorial] = useState(false);
   const [showInGameSettings, setShowInGameSettings] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
+  // Splash on every launch
+  const [splashDone, setSplashDone] = useState(false);
 
   const needsLang = !langChosen;
   const needsProfile = !profile?.created;
@@ -158,6 +161,11 @@ const Index = () => {
     setState(s => ({ ...s, settings }));
   }, []);
 
+  // Show splash on every launch — sits above everything else.
+  if (!splashDone) {
+    return <SplashScreen onDone={() => setSplashDone(true)} />;
+  }
+
   if (needsLang) {
     return (
       <div className="w-full h-screen overflow-hidden bg-background">
@@ -168,27 +176,15 @@ const Index = () => {
 
   if (needsProfile) {
     return (
-      <>
-        <div className="rotate-prompt">
-          <div className="icon">📱</div>
-          <p className="font-mono text-lg text-primary">Rotate your device</p>
-          <p className="font-mono text-xs text-muted-foreground">NeonMultiverse is best played in landscape</p>
-        </div>
-        <div className="w-full h-screen overflow-hidden bg-background rotate-app-content">
-          <ProfileScreen onComplete={handleProfileComplete} />
-        </div>
-      </>
+      <div className="w-full h-screen overflow-hidden bg-background">
+        <ProfileScreen onComplete={handleProfileComplete} />
+      </div>
     );
   }
 
   return (
     <>
-      <div className="rotate-prompt">
-        <div className="icon">📱</div>
-        <p className="font-mono text-lg text-primary">Rotate your device</p>
-        <p className="font-mono text-xs text-muted-foreground">NeonMultiverse is best played in landscape</p>
-      </div>
-      <div className="w-full h-screen overflow-hidden bg-background rotate-app-content">
+      <div className="w-full h-screen overflow-hidden bg-background">
         <GameCanvas state={state} onStateChange={setState} />
         {showTutorial && <TutorialOverlay onComplete={handleTutorialComplete} />}
         <MenuScreen state={state} onPlay={handlePlay} onShop={handleShop} onGhostMode={handleGhostMode} onChaosMode={handleChaosMode} onSettings={handleSettings} onAchievements={() => setShowAchievements(true)} profile={profile} />
